@@ -1,5 +1,7 @@
+import { type Server } from "http";
 import { createModuleLogger } from "./utils/logger.js";
 import { config } from "./config/index.js";
+import { createDashboardServer } from "./dashboard/server.js";
 import { checkConnection, closeConnection } from "./database/client.js";
 import { leadRepository } from "./database/repositories/lead.repository.js";
 import {
@@ -19,12 +21,14 @@ const log = createModuleLogger("orchestrator");
 
 export class Orchestrator {
   private workers: Worker[] = [];
+  private dashboardServer: Server | null = null;
   private shutdownSignal = false;
 
   async start(): Promise<void> {
     log.info("Iniciando Sistema de Prospecção Automatizada");
 
     await this.checkInfrastructure();
+    this.dashboardServer = createDashboardServer(3000);
     await this.startWorkers();
     await this.scheduleScraping();
     await this.printStats();
@@ -130,6 +134,7 @@ export class Orchestrator {
     await screenshotGenerator.close();
     await closeQueues();
     await closeConnection();
+    this.dashboardServer?.close();
 
     log.info("Sistema encerrado com segurança");
   }
