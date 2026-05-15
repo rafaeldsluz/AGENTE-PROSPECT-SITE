@@ -6,7 +6,7 @@ dotenv.config();
 const schema = z.object({
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().default("redis://localhost:6379"),
-  ANTHROPIC_API_KEY: z.string().min(1),
+  DEEPSEEK_API_KEY: z.string().min(1),
   EVOLUTION_API_URL: z.string().url(),
   EVOLUTION_API_KEY: z.string().min(1),
   EVOLUTION_INSTANCE: z.string().min(1),
@@ -40,8 +40,8 @@ export const config = {
   redis: {
     url: env.REDIS_URL,
   },
-  anthropic: {
-    apiKey: env.ANTHROPIC_API_KEY,
+  deepseek: {
+    apiKey: env.DEEPSEEK_API_KEY,
   },
   evolution: {
     url: env.EVOLUTION_API_URL,

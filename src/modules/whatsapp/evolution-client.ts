@@ -22,12 +22,6 @@ interface SendMediaPayload {
   fileName?: string;
 }
 
-interface MessageResponse {
-  key: { id: string };
-  message: Record<string, unknown>;
-  status: string;
-}
-
 interface ConnectionState {
   state: "open" | "close" | "connecting";
   statusReason?: number;

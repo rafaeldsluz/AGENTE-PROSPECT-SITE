@@ -5,7 +5,6 @@ import { leadRepository } from "./database/repositories/lead.repository.js";
 import {
   scrapeQueue,
   pipelineQueue,
-  dispatchQueue,
   getQueueStats,
   closeQueues,
 } from "./modules/queue/queue-manager.js";

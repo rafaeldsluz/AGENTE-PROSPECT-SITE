@@ -1,12 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { config } from "../../config/index.js";
+import { deepseekChat } from "../../utils/deepseek-client.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import { withRetry } from "../../utils/retry.js";
 import type { BusinessEnriched } from "../../types/business.types.js";
 
 const log = createModuleLogger("ai:message-generator");
-
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
 // Templates base para variar as mensagens e evitar padrão detectável
 const MESSAGE_TEMPLATES = [
@@ -39,10 +36,9 @@ export class MessageGenerator {
   }
 
   private async generateWithAI(business: BusinessEnriched): Promise<string> {
-    log.debug({ name: business.name }, "Gerando mensagem via Claude");
+    log.debug({ name: business.name }, "Gerando mensagem via DeepSeek");
 
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+    const text = await deepseekChat({
       max_tokens: 250,
       system: `Você é um profissional de marketing digital que aborda empresas locais com uma demonstração visual gratuita.
 Regras OBRIGATÓRIAS:
@@ -60,8 +56,6 @@ Regras OBRIGATÓRIAS:
         },
       ],
     });
-
-    const text = response.content[0]?.type === "text" ? response.content[0].text.trim() : "";
     if (!text || text.length < 50) throw new Error("Mensagem muito curta");
 
     return text;

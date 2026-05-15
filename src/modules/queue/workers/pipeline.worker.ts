@@ -1,5 +1,5 @@
 import { Worker, type Job } from "bullmq";
-import { redisConnection, pipelineQueue, dispatchQueue } from "../queue-manager.js";
+import { redisConnection, dispatchQueue } from "../queue-manager.js";
 import { createModuleLogger } from "../../../utils/logger.js";
 import { leadRepository } from "../../../database/repositories/lead.repository.js";
 import { websiteValidator } from "../../validator/website-validator.js";

@@ -30,6 +30,8 @@ export interface TemplateData {
   accentColor: string;
   instagram: string | null;
   facebook: string | null;
+  rating?: number | null;
+  reviewCount?: number | null;
 }
 
 export interface RenderedPage {

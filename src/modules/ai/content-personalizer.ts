@@ -1,5 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { config } from "../../config/index.js";
+import { deepseekChat } from "../../utils/deepseek-client.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import { withRetry } from "../../utils/retry.js";
 import type { BusinessEnriched } from "../../types/business.types.js";
@@ -7,8 +6,6 @@ import type { TemplateData } from "../../types/template.types.js";
 import { formatBrazilianPhone } from "../../utils/phone.js";
 
 const log = createModuleLogger("ai:content-personalizer");
-
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
 const NICHE_DEFAULTS: Record<string, Partial<TemplateData>> = {
   oficina: {
@@ -128,8 +125,7 @@ export class ContentPersonalizer {
       ? `${business.reviewCount} avaliações, média ${business.rating?.toFixed(1)}`
       : "Sem avaliações ainda";
 
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+    const text = await deepseekChat({
       max_tokens: 300,
       system: `Você cria textos de landing page para negócios locais brasileiros.
 Retorne APENAS JSON com: {"heroHeadline": "...", "heroSubtitle": "...", "ctaText": "..."}
@@ -142,8 +138,6 @@ Foco em benefício para o cliente, não na empresa. Tom profissional e confiante
         },
       ],
     });
-
-    const text = response.content[0]?.type === "text" ? response.content[0].text : "{}";
     const parsed = JSON.parse(text) as { heroHeadline: string; heroSubtitle: string; ctaText: string };
 
     return {

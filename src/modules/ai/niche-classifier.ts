@@ -1,5 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { config } from "../../config/index.js";
+import { deepseekChat } from "../../utils/deepseek-client.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import { withRetry } from "../../utils/retry.js";
 import type { Niche } from "../../types/business.types.js";
@@ -16,8 +15,6 @@ const VALID_NICHES: Niche[] = [
   "oficina", "clinica", "restaurante", "academia",
   "imoveis", "estetica", "loja", "servicos", "outros",
 ];
-
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
 export class NicheClassifier {
   async classify(companyName: string, category: string): Promise<ClassificationResult> {
@@ -91,10 +88,9 @@ export class NicheClassifier {
   }
 
   private async classifyWithAI(companyName: string, category: string): Promise<ClassificationResult> {
-    log.debug({ name: companyName }, "Classificando nicho via Claude");
+    log.debug({ name: companyName }, "Classificando nicho via DeepSeek");
 
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+    const text = await deepseekChat({
       max_tokens: 200,
       system: `Você é um classificador de nichos de negócios locais brasileiros.
 Classifique o negócio em exatamente um dos seguintes nichos:
@@ -108,8 +104,6 @@ Responda APENAS em JSON com o formato: {"niche": "...", "confidence": 0.0-1.0, "
         },
       ],
     });
-
-    const text = response.content[0]?.type === "text" ? response.content[0].text : "{}";
 
     try {
       const parsed = JSON.parse(text) as { niche: string; confidence: number; reasoning: string };

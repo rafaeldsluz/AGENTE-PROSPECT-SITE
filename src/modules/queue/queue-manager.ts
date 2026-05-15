@@ -1,4 +1,4 @@
-import { Queue, Worker, QueueEvents, type Job } from "bullmq";
+import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import { config } from "../../config/index.js";
 import { createModuleLogger } from "../../utils/logger.js";
@@ -38,8 +38,6 @@ export const dispatchQueue = new Queue<DispatchJobData>("dispatch", {
   defaultJobOptions: {
     ...QUEUE_DEFAULTS.defaultJobOptions,
     attempts: 2,
-    // Rate limit: máx 1 disparo por 2 minutos
-    rateLimiter: { max: 1, duration: 120_000 },
   },
 });
 
