@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import UserAgent from "user-agents";
 import { randomDelay, sleep } from "../../utils/delay.js";
@@ -143,6 +144,13 @@ export class GoogleMapsScraper {
     const maxScrollAttempts = 15;
 
     while (results.length < maxResults && scrollAttempts < maxScrollAttempts) {
+      // Detecta fim real da lista antes de tentar coletar hrefs
+      const endOfList = await page.$('span:has-text("Você chegou ao fim"), span:has-text("You\'ve reached the end")');
+      if (endOfList) {
+        log.debug("Fim da lista detectado pelo Google Maps");
+        break;
+      }
+
       // Coleta todos os hrefs visíveis de uma vez (sem round-trip por link)
       const hrefs = await page.evaluate(() =>
         Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="/maps/place/"]'))
@@ -152,8 +160,11 @@ export class GoogleMapsScraper {
 
       const newHrefs = hrefs.filter((h) => !seenHrefs.has(h));
       if (newHrefs.length === 0) {
-        // Nenhum item novo após scroll — fim da lista
-        break;
+        // Pode ser loading — tenta mais um scroll antes de desistir
+        await sidebar.evaluate((el) => el.scrollBy(0, 300));
+        await page.waitForSelector('[role="feed"] [aria-busy="true"]', { state: "hidden", timeout: 3_000 }).catch(() => {});
+        scrollAttempts++;
+        continue;
       }
 
       for (const href of newHrefs) {
@@ -173,7 +184,11 @@ export class GoogleMapsScraper {
             log.debug({ name: business.name }, "Business extraído");
           }
 
-          // Delay humano entre negócios: 1.5-4s (era 5-15s)
+          // Volta para a lista e aguarda o feed reaparecer
+          await page.goBack({ waitUntil: "domcontentloaded", timeout: 10_000 }).catch(() => {});
+          await page.waitForSelector('[role="feed"]', { timeout: 5_000 }).catch(() => {});
+
+          // Delay humano entre negócios: 1.5-4s
           await randomDelay(1_500, 4_000);
         } catch (err) {
           log.debug({ href, error: String(err) }, "Erro ao extrair negócio");
@@ -182,7 +197,9 @@ export class GoogleMapsScraper {
 
       if (results.length < maxResults) {
         await sidebar.evaluate((el) => el.scrollBy(0, 600));
-        await randomDelay(800, 1_800);
+        // Aguarda spinner de carregamento sumir em vez de sleep fixo
+        await page.waitForSelector('[role="feed"] [aria-busy="true"]', { state: "hidden", timeout: 3_000 }).catch(() => {});
+        await randomDelay(600, 1_200);
         scrollAttempts++;
       }
     }
@@ -224,11 +241,12 @@ export class GoogleMapsScraper {
           phoneBtn?.getAttribute("aria-label")?.replace(/^[^:]+:\s*/, "").trim() ??
           null;
 
-        // Website — texto do link (domínio visível), não o href que pode ser redirect do Google
+        // Website — href real tem prioridade (mais confiável que texto truncado)
         const websiteLink = main.querySelector<HTMLAnchorElement>(
           'a[data-item-id="authority"], a[aria-label*="Site"], a[aria-label*="Website"]'
         );
         const website =
+          websiteLink?.getAttribute("href") ??
           websiteLink?.querySelector(".Io6YTe, [class*='fontBodyMedium']")?.textContent?.trim() ??
           websiteLink?.textContent?.trim() ??
           null;
@@ -265,7 +283,7 @@ export class GoogleMapsScraper {
       const reviewCount = raw.reviewRaw ? parseInt(raw.reviewRaw.replace(/\D/g, "")) : null;
 
       return {
-        placeId: raw.placeId || `${normalizedPhone ?? ""}${Date.now()}`,
+        placeId: raw.placeId || createHash("md5").update(`${raw.name}|${city}`).digest("hex"),
         name: raw.name.trim(),
         category: raw.category.trim(),
         address: raw.address.trim(),
