@@ -9,6 +9,7 @@ import { metricsRegistry, updatePrometheusMetrics } from "../metrics/index.js";
 import { createModuleLogger } from "../utils/logger.js";
 import { config } from "../config/index.js";
 import { getDispatchStatus, setManualOverride } from "../modules/dispatch-schedule.js";
+import { dispatchRepository } from "../database/repositories/dispatch.repository.js";
 
 const log = createModuleLogger("dashboard");
 
@@ -97,6 +98,7 @@ interface StatsSnapshot {
   dbStats: Record<string, number>;
   queueStats: Awaited<ReturnType<typeof getQueueStats>>;
   recentLeads: Lead[];
+  failedDispatches: Awaited<ReturnType<typeof dispatchRepository.getRecentFailed>>;
   total: number;
   timestamp: number;
 }
@@ -108,15 +110,16 @@ const CACHE_TTL_MS = 1_500;
 async function getStats(): Promise<StatsSnapshot> {
   if (_cachedStats !== null && Date.now() < _cacheExpiresAt) return _cachedStats;
 
-  const [dbStats, queueStats, recentLeads] = await Promise.all([
+  const [dbStats, queueStats, recentLeads, failedDispatches] = await Promise.all([
     leadRepository.countByStatus(),
     getQueueStats(),
     db.select().from(leads).orderBy(desc(leads.updatedAt)).limit(50),
+    dispatchRepository.getRecentFailed(10),
   ]);
 
   const total = Object.values(dbStats).reduce((a, b) => a + b, 0);
 
-  _cachedStats = { dbStats, queueStats, recentLeads, total, timestamp: Date.now() };
+  _cachedStats = { dbStats, queueStats, recentLeads, failedDispatches, total, timestamp: Date.now() };
   _cacheExpiresAt = Date.now() + CACHE_TTL_MS;
 
   return _cachedStats;
@@ -183,9 +186,20 @@ function getDashboardHtml(): string {
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
     @media (max-width: 768px) { .hide-mobile { display: none !important; } }
+    /* Toast */
+    #toast-container { position: fixed; top: 18px; right: 18px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+    .toast { pointer-events: auto; background: #0d1424; border: 1px solid rgba(34,197,94,0.35); border-radius: 12px; padding: 12px 16px; min-width: 260px; max-width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); display: flex; gap: 10px; align-items: flex-start; animation: toast-in 0.3s ease; }
+    .toast.error { border-color: rgba(239,68,68,0.35); }
+    @keyframes toast-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes toast-out { to { opacity: 0; transform: translateX(20px); } }
+    .toast-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .toast-body { flex: 1; min-width: 0; }
+    .toast-title { font-size: 12px; font-weight: 700; color: #e8edf5; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toast-sub { font-size: 11px; color: #7d8ea6; margin-top: 2px; }
   </style>
 </head>
 <body>
+  <div id="toast-container"></div>
   <div class="max-w-screen-xl mx-auto px-4 py-6 space-y-4">
 
     <!-- Header -->
@@ -230,11 +244,17 @@ function getDashboardHtml(): string {
     </div>
 
     <!-- Stat Cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       <div class="glass p-4 space-y-1.5">
         <p class="text-xs font-medium uppercase tracking-widest" style="color:var(--text-muted)">Total</p>
         <p class="stat-value text-white" id="s-total">—</p>
         <p class="text-xs" style="color:var(--text-secondary)">leads coletados</p>
+      </div>
+      <div class="glass p-4 space-y-1.5"
+           style="background:linear-gradient(135deg,rgba(99,102,241,0.08) 0%,var(--surface) 70%);border-color:rgba(99,102,241,0.2)">
+        <p class="text-xs font-medium uppercase tracking-widest" style="color:#6366f1">Qualificados</p>
+        <p class="stat-value" style="color:#818cf8" id="s-qualified">—</p>
+        <p class="text-xs" id="s-qual-rate" style="color:var(--text-secondary)">taxa de qualificação</p>
       </div>
       <div class="glass p-4 space-y-1.5">
         <p class="text-xs font-medium uppercase tracking-widest" style="color:var(--text-muted)">Fila de Envio</p>
@@ -321,6 +341,27 @@ function getDashboardHtml(): string {
       </div>
     </div>
 
+    <!-- Falhas de Disparo -->
+    <div class="glass p-5" id="failures-section" style="display:none">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="text-base">⚠️</span>
+        <h2 class="text-xs font-semibold uppercase tracking-widest" style="color:#ef4444">Falhas de Disparo</h2>
+        <span id="failures-count" class="badge" style="background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.2)"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm" style="min-width:560px">
+          <thead>
+            <tr class="text-left border-b" style="border-color:var(--border)">
+              <th class="pb-3 pr-4 text-xs font-medium uppercase tracking-wider" style="color:var(--text-muted)">Telefone</th>
+              <th class="pb-3 pr-4 text-xs font-medium uppercase tracking-wider" style="color:var(--text-muted)">Tentativa</th>
+              <th class="pb-3 text-xs font-medium uppercase tracking-wider" style="color:var(--text-muted)">Motivo da Falha</th>
+            </tr>
+          </thead>
+          <tbody id="failures-table"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
 <script>
@@ -381,6 +422,56 @@ function scoreBar(v) {
     <span style="color:\${c};font-size:11px;font-weight:700;font-family:monospace;min-width:22px;text-align:right">\${p}</span>
     <div class="score-bar" style="width:48px"><div class="score-fill" style="width:\${p}%;background:\${c}"></div></div>
   </div>\`;
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(icon, title, sub, isError) {
+  const c = document.getElementById('toast-container');
+  if (!c) return;
+  const t = document.createElement('div');
+  t.className = 'toast' + (isError ? ' error' : '');
+  t.innerHTML = \`<div class="toast-icon">\${icon}</div>
+    <div class="toast-body">
+      <div class="toast-title">\${esc(title)}</div>
+      \${sub ? \`<div class="toast-sub">\${esc(sub)}</div>\` : ''}
+    </div>\`;
+  c.appendChild(t);
+  setTimeout(() => {
+    t.style.animation = 'toast-out 0.3s ease forwards';
+    setTimeout(() => t.remove(), 300);
+  }, 6000);
+}
+
+// Detecta novos leads screenshot_ready comparando com tick anterior
+let _prevReadyIds = new Set();
+function detectNewQualified(leads) {
+  const current = leads.filter(l => l.status === 'screenshot_ready');
+  const currentIds = new Set(current.map(l => l.id));
+  current.forEach(l => {
+    if (!_prevReadyIds.has(l.id)) {
+      const nicheIcon = NICHE_ICONS[l.niche] || '📦';
+      const score = l.score ? ' · score ' + Math.round(l.score) : '';
+      showToast(nicheIcon, l.name, (l.city || '') + (l.niche ? ' · ' + l.niche : '') + score, false);
+    }
+  });
+  _prevReadyIds = currentIds;
+}
+
+// ── Falhas de disparo ─────────────────────────────────────────────────────
+function renderFailures(data) {
+  const failures = data.failedDispatches || [];
+  const section = document.getElementById('failures-section');
+  const tbody = document.getElementById('failures-table');
+  const badge = document.getElementById('failures-count');
+  if (!section || !tbody) return;
+  if (!failures.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  if (badge) badge.textContent = failures.length + ' falha' + (failures.length > 1 ? 's' : '');
+  tbody.innerHTML = failures.map(f => \`<tr class="table-row border-b" style="border-color:rgba(255,255,255,0.04)">
+    <td class="py-3 pr-4"><span class="font-mono text-xs" style="color:var(--text-secondary)">\${esc(f.whatsapp)}</span></td>
+    <td class="py-3 pr-4"><span class="text-xs font-mono" style="color:var(--text-muted)">\${fmtDate(f.sentAt)}</span></td>
+    <td class="py-3"><span class="text-xs px-2 py-1 rounded" style="background:rgba(239,68,68,0.1);color:#ef4444">\${esc(f.errorMessage || 'Erro desconhecido')}</span></td>
+  </tr>\`).join('');
 }
 
 // ── Dispatch control ──────────────────────────────────────────────────────
@@ -472,13 +563,21 @@ window.retryLead = retryLead;
 
 // ── Render ──────────────────────────────────────────────────────────────────
 function renderCards(data) {
-  const dispatched = data.dbStats.dispatched || 0;
-  const replied    = data.dbStats.replied    || 0;
-  setVal('s-total',        data.total);
-  setVal('s-ready',        data.dbStats.screenshot_ready || 0);
+  const dispatched  = data.dbStats.dispatched       || 0;
+  const replied     = data.dbStats.replied          || 0;
+  const ready       = data.dbStats.screenshot_ready || 0;
+  // Qualificados = todos que passaram pela pipeline completa
+  const qualified   = ready + dispatched + replied;
+  const disqualified = data.dbStats.disqualified    || 0;
+  const scraped     = data.total;
+  setVal('s-total',        scraped);
+  setVal('s-qualified',    qualified);
+  setVal('s-ready',        ready);
   setVal('s-dispatched',   dispatched);
   setVal('s-replied',      replied);
-  setVal('s-disqualified', data.dbStats.disqualified || 0);
+  setVal('s-disqualified', disqualified);
+  const qr = document.getElementById('s-qual-rate');
+  if (qr) qr.textContent = scraped > 0 ? pct(qualified, scraped) + '% dos coletados' : 'sem dados';
   const rr = document.getElementById('s-reply-rate');
   if (rr) rr.textContent = dispatched > 0 ? pct(replied, dispatched) + '% conversão' : 'aguardando envios';
 }
@@ -573,6 +672,8 @@ function renderAll(data) {
   renderFunnel(data);
   renderQueues(data);
   renderLeads(data);
+  renderFailures(data);
+  detectNewQualified(data.recentLeads || []);
   const lu = document.getElementById('last-update');
   if (lu) lu.textContent = 'há ' + timeAgo(data.timestamp);
 }

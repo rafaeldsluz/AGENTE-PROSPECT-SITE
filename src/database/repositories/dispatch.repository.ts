@@ -1,4 +1,4 @@
-import { eq, and, gte, sql } from "drizzle-orm";
+import { eq, and, gte, sql, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "../client.js";
 import { dispatches, type Dispatch, type NewDispatch } from "../schema.js";
@@ -45,6 +45,15 @@ export class DispatchRepository {
       .update(dispatches)
       .set({ status, errorMessage })
       .where(eq(dispatches.id, id));
+  }
+
+  async getRecentFailed(limit = 10): Promise<Dispatch[]> {
+    return db
+      .select()
+      .from(dispatches)
+      .where(eq(dispatches.status, "failed"))
+      .orderBy(desc(dispatches.sentAt))
+      .limit(limit);
   }
 }
 

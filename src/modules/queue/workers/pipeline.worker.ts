@@ -11,6 +11,7 @@ import { templateEngine } from "../../renderer/template-engine.js";
 import { screenshotGenerator } from "../../screenshot/screenshot-generator.js";
 import { mockupComposer } from "../../screenshot/mockup-composer.js";
 import { config } from "../../../config/index.js";
+import { isWithinDispatchWindow } from "../../dispatch-schedule.js";
 import type { PipelineJobData, DispatchJobData } from "../../../types/queue.types.js";
 import type { BusinessRaw, BusinessValidated, BusinessEnriched } from "../../../types/business.types.js";
 import type { Lead } from "../../../database/schema.js";
@@ -141,9 +142,12 @@ export function createPipelineWorker(): Worker {
         message,
       };
 
-      await dispatchQueue.add(`dispatch-${leadId}`, dispatchJob, {
-        delay: Math.floor(Math.random() * 300_000) + 60_000, // 1–6 min random delay
-      });
+      // Durante horário comercial: delay curto (30–90s) para parecer humano.
+      // Fora do horário: delay longo — o dispatch.worker vai reagendar para 08:00 de qualquer forma.
+      const dispatchDelay = isWithinDispatchWindow()
+        ? Math.floor(Math.random() * 60_000) + 30_000   // 30s–90s
+        : Math.floor(Math.random() * 300_000) + 60_000; // 1–6 min
+      await dispatchQueue.add(`dispatch-${leadId}`, dispatchJob, { delay: dispatchDelay });
 
       await job.updateProgress(100);
       log.info({ name: lead.name, niche: enriched.niche, score: enriched.score }, "Pipeline concluído");
