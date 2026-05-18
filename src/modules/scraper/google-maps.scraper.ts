@@ -8,7 +8,8 @@ import type { BusinessRaw } from "../../types/business.types.js";
 
 const log = createModuleLogger("scraper");
 
-const BLOCKED_RESOURCES = new Set(["image", "media", "font", "stylesheet"]);
+// Não bloquear stylesheet — o Google Maps precisa deles para inicializar
+const BLOCKED_RESOURCES = new Set(["media", "font"]);
 
 interface ScraperOptions {
   maxResults: number;
