@@ -22,6 +22,12 @@ const DIRECTORY_DOMAINS = new Set([
   "rappi.com.br", "uber.com", "99app.com",
   "booking.com", "airbnb.com", "olx.com.br",
   "mercadolivre.com.br", "shopee.com.br", "americanas.com.br",
+  // Domínios genéricos que geram falsos positivos no gerador de candidatos
+  "resultados.com", "resultados.com.br",
+  "patrocinado.com.br", "patrocinado.com",
+  "servicos.com.br", "servicos.com",
+  "empresa.com.br", "empresa.com",
+  "negocios.com.br", "negocios.com",
 ]);
 
 export function extractDomain(url: string): string {

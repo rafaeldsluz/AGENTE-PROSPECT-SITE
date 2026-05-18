@@ -47,49 +47,100 @@ export class NicheClassifier {
 
     const patterns: Array<{ niche: Niche; keywords: string[]; confidence: number }> = [
       {
+        niche: "advogado",
+        keywords: [
+          "advocacia", "advogado", "escritório jurídico", "jurídico", "direito", "oab",
+          "defesa criminal", "trabalhista", "previdenciário", "tributário", "família",
+          "criminal", "cível", "consultório jurídic", "dr. ", "dra. ",
+        ],
+        confidence: 0.92,
+      },
+      {
         niche: "oficina",
-        keywords: ["oficina", "mecânic", "auto", "pneu", "carro", "veículo", "motor", "freio", "alinhamento"],
+        keywords: [
+          "oficina", "mecânic", "auto center", "auto eletric", "pneu", "borracharia",
+          "funilaria", "pintura automotiv", "veículo", "motor", "freio", "alinhamento",
+          "suspensão", "radiador", "cambio", "câmbio", "injeção eletrônica", "retífica",
+          "carro", "moto", "motos ", "moto ", "motocicleta", "guincho",
+        ],
         confidence: 0.92,
       },
       {
         niche: "clinica",
-        keywords: ["clínica", "médic", "dentist", "odontolog", "saúde", "fisiotera", "psicolog", "nutricion"],
+        keywords: [
+          "clínica", "médic", "dentist", "odontolog", "saúde", "fisiotera",
+          "psicolog", "nutricion", "veterinár", "veterinário", "vet ", "bicho",
+          "pet ", "ortopedi", "cardiolog", "dermatolog", "ginecolog", "pediatr",
+          "consultório", "laboratório", "exame", "raio-x", "fonoaudiolog", "terapia",
+          "quiroprat", "acupuntur", "homeopat", "enfermag",
+        ],
         confidence: 0.92,
       },
       {
         niche: "restaurante",
-        keywords: ["restaurante", "lanchonete", "pizz", "hamburguer", "sushi", "comida", "food", "café", "bar ", "churrasco"],
+        keywords: [
+          "restaurante", "lanchonete", "pizz", "hamburguer", "burger", "sushi",
+          "comida", "food", "café ", "cafeteria", "bistrô", "bistro", "churrasco",
+          "marmit", "delivery", "self service", "buffet", "padaria", "confeitaria",
+          "sorveteria", "açaí", "tapioca", "crepe", "temaki", "yakisoba", "hotdog",
+          "pastel", "frango", "steakhouse", "espetinho", "boteco", "choperia",
+        ],
         confidence: 0.90,
       },
       {
         niche: "academia",
-        keywords: ["academia", "gym", "crossfit", "muscula", "pilates", "yoga", "funcional", "fitness"],
+        keywords: [
+          "academia", "gym", "crossfit", "muscula", "pilates", "yoga",
+          "funcional", "fitness", "box ", "muay thai", "jiu jitsu", "jiu-jitsu",
+          "judô", "karatê", "capoeira", "boxe", "natação", "spinning", "zumba",
+          "studio ", "estúdio ", "treino", "personal trainer", "hiit",
+        ],
         confidence: 0.90,
       },
       {
         niche: "imoveis",
-        keywords: ["imobiliária", "imóveis", "corretor", "aluguel", "venda de imóv"],
+        keywords: [
+          "imobiliária", "imóveis", "corretor", "aluguel", "venda de imóv",
+          "apartamento", "lançamento", "incorporadora", "construtora", "loteamento",
+          "terreno", "casa ", "real estate", "imóvel",
+        ],
         confidence: 0.90,
       },
       {
         niche: "estetica",
-        keywords: ["salão", "barbearia", "beleza", "estética", "nail", "cabeleireir", "sobrancelha", "depilação"],
+        keywords: [
+          "salão", "barbearia", "beleza", "estética", "nail", "cabeleireir",
+          "sobrancelha", "depilação", "micropigmentação", "spa ", "spa,",
+          "designer de sobrancelha", "cilios", "cílios", "manicure", "pedicure",
+          "escova", "progressiva", "botox capilar", "hidratação capilar",
+          "maquiagem", "make ", "visagist", "bronzeamento", "laser", "limpeza de pele",
+          "buço", "estético", "esteticista", "massagem",
+        ],
         confidence: 0.90,
       },
       {
         niche: "loja",
-        keywords: ["loja", "pet shop", "boutique", "roupas", "calçados", "móveis", "farmácia", "mercado"],
+        keywords: [
+          "loja", "pet shop", "boutique", "roupas", "calçados", "sapatos",
+          "móveis", "farmácia", "mercado", "supermercado", "armarinho",
+          "papelaria", "livraria", "ótica", "bijuteria", "jóias", "joalheria",
+          "eletrônicos", "informática", "celular", "material de construção",
+          "tintas", "vidraçaria", "floricultura", "presentes", "utilidades",
+        ],
         confidence: 0.85,
       },
       {
         niche: "servicos",
-        keywords: ["dedetizadora", "chaveiro", "encanador", "eletricista", "pintora", "reforma", "construção"],
+        keywords: [
+          "dedetizadora", "chaveiro", "encanador", "eletricista", "pintora",
+          "reforma", "construção", "gesseiro", "marceneiro", "marmoraria",
+          "desentupidora", "limpeza", "higienização", "lavanderia", "costureira",
+          "alfaiate", "conserto", "reparo", "manutenção", "instalação",
+          "segurança", "alarme", "câmera", "cftv", "elétric", "hidráulic",
+          "jardineiro", "jardinagem", "paisagismo", "mudança", "transporte",
+          "contabilidade", "contador", "contábil",
+        ],
         confidence: 0.85,
-      },
-      {
-        niche: "advogado",
-        keywords: ["advocacia", "advogado", "escritório jurídico", "jurídico", "direito", "oab", "defesa criminal", "trabalhista"],
-        confidence: 0.92,
       },
     ];
 

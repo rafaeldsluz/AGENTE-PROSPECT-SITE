@@ -214,8 +214,9 @@ export class GoogleMapsScraper {
           const link = page.locator(`a[href="${href}"]`).first();
           await link.click();
 
-          // Espera apenas o elemento que precisamos, sem sleep fixo
           await page.waitForSelector('[role="main"] h1', { timeout: 8_000 });
+          // Aguarda elementos async (telefone, fotos, reviews) carregarem
+          await sleep(700);
 
           const business = await this.extractBusinessDetails(page, city);
           if (business) {
@@ -271,14 +272,35 @@ export class GoogleMapsScraper {
           addressBtn?.getAttribute("aria-label")?.replace(/^[^:]+:\s*/, "").trim() ??
           "";
 
-        // Telefone — tenta via texto visível, fallback no aria-label
-        const phoneBtn = main.querySelector<HTMLElement>(
-          '[data-item-id*="phone"], button[aria-label*="Telefone"], button[aria-label*="Phone"]'
-        );
-        const phone =
-          phoneBtn?.querySelector(".Io6YTe, .rogA2c, [class*='fontBodyMedium']")?.textContent?.trim() ??
-          phoneBtn?.getAttribute("aria-label")?.replace(/^[^:]+:\s*/, "").trim() ??
-          null;
+        // Telefone — 3 estratégias em cascata
+        let phone: string | null = null;
+        // 1) data-item-id ou aria-label estruturado
+        const phoneEl =
+          main.querySelector<HTMLElement>('[data-item-id*="phone"]') ??
+          main.querySelector<HTMLElement>('[data-tooltip*="Telefone"], [data-tooltip*="telefone"]') ??
+          main.querySelector<HTMLElement>('button[aria-label*="Telefone"], button[aria-label*="Phone"], a[href^="tel:"]');
+        if (phoneEl) {
+          phone =
+            phoneEl.querySelector(".Io6YTe, .rogA2c, [class*='fontBodyMedium']")?.textContent?.trim() ??
+            phoneEl.getAttribute("aria-label")?.replace(/^[^:]+:\s*/, "").trim() ??
+            phoneEl.getAttribute("href")?.replace("tel:", "").trim() ??
+            null;
+        }
+        // 2) varredura por padrão de telefone brasileiro no texto dos botões/divs
+        if (!phone) {
+          const candidates = Array.from(main.querySelectorAll<HTMLElement>('[role="button"], button, div[class]'));
+          for (const el of candidates) {
+            const t = (el.childElementCount === 0 ? el.textContent?.trim() : null) ?? "";
+            if (/^(\+55[\s-]?)?(\(?\d{2}\)?[\s-]?)[\d\s\-]{8,12}$/.test(t) && t.length <= 20) {
+              phone = t; break;
+            }
+          }
+        }
+        // 3) regex direto no HTML do painel
+        if (!phone) {
+          const m = main.innerHTML.match(/(\+55[\s-]?)?(\(?\d{2}\)?[\s-]?)(\d{4,5}[\s-]\d{4})/);
+          if (m) phone = m[0].replace(/\s{2,}/g, " ").trim();
+        }
 
         // Website — href real tem prioridade (mais confiável que texto truncado)
         const websiteLink = main.querySelector<HTMLAnchorElement>(
@@ -299,31 +321,45 @@ export class GoogleMapsScraper {
           ratingEl?.textContent?.trim() ??
           null;
 
-        // Contagem de avaliações
-        const reviewBtn = main.querySelector<HTMLElement>('button[aria-label*="avaliações"], button[aria-label*="reviews"], button[jsaction*="reviewSort"]');
-        const reviewRaw =
-          reviewBtn?.getAttribute("aria-label")?.match(/[\d.,]+/)?.[0] ??
-          reviewBtn?.textContent?.trim() ??
-          null;
+        // Contagem de avaliações — 3 estratégias
+        let reviewRaw: string | null = null;
+        const reviewBtn = main.querySelector<HTMLElement>(
+          'button[aria-label*="avaliações"], button[aria-label*="reviews"], button[jsaction*="reviewSort"]'
+        );
+        if (reviewBtn) {
+          reviewRaw =
+            reviewBtn.getAttribute("aria-label")?.match(/[\d.,]+/)?.[0] ??
+            reviewBtn.textContent?.match(/[\d.,]+/)?.[0] ??
+            null;
+        }
+        // Padrão "(X.XXX)" comum na UI do Maps
+        if (!reviewRaw) {
+          const spans = Array.from(main.querySelectorAll<HTMLElement>("span, button"));
+          for (const el of spans) {
+            const t = el.textContent?.trim() ?? "";
+            if (/^\([\d.,]+\)$/.test(t)) { reviewRaw = t.replace(/[()]/g, ""); break; }
+          }
+        }
+        // Regex no HTML como último recurso
+        if (!reviewRaw) {
+          const m = main.innerHTML.match(/(\d[\d.,]*)\s*avalia[çc][oõ]e?s?/i);
+          if (m) reviewRaw = m[1] ?? null;
+        }
 
         // PlaceId via URL canônica
         const canonicalUrl = window.location.href;
         const placeIdMatch = canonicalUrl.match(/0x[0-9a-fA-F]+:0x[0-9a-fA-F]+/);
         const placeId = placeIdMatch?.[0] ?? canonicalUrl.match(/place\/([^/]+)/)?.[1] ?? "";
 
-        // Fotos — extrai URLs de imagens do CDN Google presentes no painel
-        // Filtra ícones pequenos (=s20, =s32 etc.) e avatares de usuário
+        // Fotos — busca no documento todo (imagens ficam fora do [role="main"] em algumas versões)
         const cdnImgs = Array.from(
-          main.querySelectorAll<HTMLImageElement>('img[src*="googleusercontent"], img[src*="ggpht"]')
+          document.querySelectorAll<HTMLImageElement>('img[src*="googleusercontent"], img[src*="ggpht"]')
         )
           .map((img) => img.src)
           .filter((src) => {
-            if (!src) return false;
-            if (src.includes(".svg")) return false;
-            // Ícones pequenos têm padrão =s{1-2 dígitos} no fim ou antes de -
-            if (/=s[0-9]{1,2}($|[^0-9])/.test(src)) return false;
-            // Avatares de usuário (reviews) têm padrão -c0x ou -mo-br
-            if (src.includes("-c0x") || src.includes("-mo-br")) return false;
+            if (!src || src.includes(".svg")) return false;
+            if (src.includes("-c0x") || src.includes("-mo-br")) return false; // avatares de reviews
+            if (/=s[0-9]{1,2}($|[^0-9])/.test(src)) return false;            // ícones < 100px
             return true;
           });
         const photoUrls = [...new Set(cdnImgs)].slice(0, 10);

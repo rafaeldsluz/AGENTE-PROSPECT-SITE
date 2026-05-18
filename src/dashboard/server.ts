@@ -8,6 +8,7 @@ import { getQueueStats, pipelineQueue } from "../modules/queue/queue-manager.js"
 import { metricsRegistry, updatePrometheusMetrics } from "../metrics/index.js";
 import { createModuleLogger } from "../utils/logger.js";
 import { config } from "../config/index.js";
+import { getDispatchStatus, setManualOverride } from "../modules/dispatch-schedule.js";
 
 const log = createModuleLogger("dashboard");
 
@@ -170,6 +171,12 @@ function getDashboardHtml(): string {
     .retry-btn { cursor: pointer; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 500; transition: all 0.15s; }
     .retry-btn:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.5); color: #a5b4fc; }
     .retry-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .dispatch-btn { cursor: pointer; border: none; border-radius: 8px; padding: 7px 16px; font-size: 12px; font-weight: 600; font-family: inherit; transition: all 0.15s; letter-spacing: 0.1px; }
+    .dispatch-btn.active { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); color: #22c55e; }
+    .dispatch-btn.active:hover { background: rgba(34,197,94,0.25); }
+    .dispatch-btn.inactive { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); color: #ef4444; }
+    .dispatch-btn.inactive:hover { background: rgba(239,68,68,0.25); }
+    .window-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
     @keyframes value-flash { 0% { opacity: 0.5; transform: translateY(-3px); } 100% { opacity: 1; transform: translateY(0); } }
     .value-changed { animation: value-flash 0.25s ease forwards; }
     ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -198,6 +205,27 @@ function getDashboardHtml(): string {
           <span class="text-xs font-medium" style="color:var(--text-secondary)" id="live-text">Conectando...</span>
         </div>
         <span class="text-xs hide-mobile" style="color:var(--text-muted)" id="last-update"></span>
+      </div>
+    </div>
+
+    <!-- Dispatch Control -->
+    <div class="glass px-5 py-4 flex flex-wrap items-center justify-between gap-4"
+         id="dispatch-control" style="background:linear-gradient(135deg,rgba(34,197,94,0.06) 0%,var(--surface) 60%)">
+      <div class="flex items-center gap-3 flex-wrap">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-semibold text-white">Janela de Disparo</span>
+          <span id="window-badge" class="window-badge" style="background:rgba(100,116,139,0.15);color:#64748b">
+            <span id="window-dot" style="width:6px;height:6px;border-radius:50%;background:#64748b;display:inline-block"></span>
+            <span id="window-label">Carregando...</span>
+          </span>
+        </div>
+        <span id="window-info" class="text-xs" style="color:var(--text-muted)"></span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs" style="color:var(--text-muted)" id="override-info"></span>
+        <button id="dispatch-toggle-btn" class="dispatch-btn inactive" onclick="toggleDispatch()">
+          ⏳ Carregando...
+        </button>
       </div>
     </div>
 
@@ -279,7 +307,7 @@ function getDashboardHtml(): string {
               <th class="pb-3 pr-4 text-xs font-medium uppercase tracking-wider" style="color:var(--text-muted)">Nicho</th>
               <th class="pb-3 pr-4 text-xs font-medium uppercase tracking-wider text-right" style="color:var(--text-muted)">Score</th>
               <th class="pb-3 pr-4 text-xs font-medium uppercase tracking-wider" style="color:var(--text-muted)">Status</th>
-              <th class="pb-3 pr-4 text-xs font-medium uppercase tracking-wider hide-mobile" style="color:var(--text-muted)">Atualizado</th>
+              <th class="pb-3 pr-4 text-xs font-medium uppercase tracking-wider hide-mobile" style="color:var(--text-muted)">Coletado em</th>
               <th class="pb-3 text-xs font-medium uppercase tracking-wider" style="color:var(--text-muted)">Ação</th>
             </tr>
           </thead>
@@ -313,6 +341,12 @@ const RETRYABLE = new Set(['scraped','validated','scored','page_generated','scre
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2, '0');
+  return pad(d.getDate()) + '/' + pad(d.getMonth()+1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 function timeAgo(ts) {
   const d = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
@@ -348,6 +382,80 @@ function scoreBar(v) {
     <div class="score-bar" style="width:48px"><div class="score-fill" style="width:\${p}%;background:\${c}"></div></div>
   </div>\`;
 }
+
+// ── Dispatch control ──────────────────────────────────────────────────────
+let _dispatchStatus = null;
+
+function renderDispatchControl(s) {
+  _dispatchStatus = s;
+  const btn    = document.getElementById('dispatch-toggle-btn');
+  const badge  = document.getElementById('window-badge');
+  const dot    = document.getElementById('window-dot');
+  const label  = document.getElementById('window-label');
+  const info   = document.getElementById('window-info');
+  const ovInfo = document.getElementById('override-info');
+  if (!btn || !badge || !dot || !label) return;
+
+  const active = s.canDispatch;
+
+  // Janela badge
+  if (s.withinWindow) {
+    badge.style.background = 'rgba(34,197,94,0.12)';
+    badge.style.color = '#22c55e';
+    dot.style.background = '#22c55e';
+    label.textContent = '08:00 – 18:00 ativa';
+  } else {
+    badge.style.background = 'rgba(100,116,139,0.12)';
+    badge.style.color = '#64748b';
+    dot.style.background = '#64748b';
+    label.textContent = 'Fora da janela';
+  }
+
+  if (info) info.textContent = s.withinWindow
+    ? 'Horário: ' + s.currentHourBRT + ':xx BRT'
+    : (s.nextWindowOpen ? 'Abre às ' + s.nextWindowOpen : '');
+
+  // Override info
+  if (ovInfo) ovInfo.textContent = s.manualOverride ? '🔓 override manual ativo' : '';
+
+  // Button
+  btn.className = 'dispatch-btn ' + (active ? 'active' : 'inactive');
+  btn.textContent = s.manualOverride
+    ? '🛑 Pausar Disparo'
+    : (s.withinWindow ? '✅ Dentro da Janela' : '🚀 Disparar Agora');
+  btn.disabled = s.withinWindow && !s.manualOverride; // botão só ativo fora da janela ou em override
+  if (s.withinWindow && !s.manualOverride) {
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'default';
+  } else {
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+  }
+}
+
+function toggleDispatch() {
+  const newEnabled = _dispatchStatus ? !_dispatchStatus.manualOverride : true;
+  fetch('/api/dispatch/override', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: newEnabled }),
+  })
+    .then(r => r.json())
+    .then(d => renderDispatchControl(d))
+    .catch(console.error);
+}
+window.toggleDispatch = toggleDispatch;
+
+function fetchDispatchStatus() {
+  fetch('/api/dispatch/status')
+    .then(r => r.json())
+    .then(d => renderDispatchControl(d))
+    .catch(console.error);
+}
+
+// Atualiza status de disparo a cada 30s
+setInterval(fetchDispatchStatus, 30_000);
+fetchDispatchStatus();
 
 // ── Retry ──────────────────────────────────────────────────────────────────
 function retryLead(id) {
@@ -454,7 +562,7 @@ function filterLeads() {
       <td class="py-3 pr-4">\${nicheBadge(l.niche)}</td>
       <td class="py-3 pr-4">\${scoreBar(l.score)}</td>
       <td class="py-3 pr-4">\${statusBadge(l.status)}</td>
-      <td class="py-3 pr-4 hide-mobile"><span class="text-xs" style="color:var(--text-muted)">\${timeAgo(l.updatedAt)}</span></td>
+      <td class="py-3 pr-4 hide-mobile"><span class="text-xs font-mono" style="color:var(--text-muted)">\${fmtDate(l.scrapedAt)}</span></td>
       <td class="py-3">\${retryBtn}</td>
     </tr>\`;
   }).join('');
@@ -551,6 +659,19 @@ export function createDashboardServer(port = 3000): Server {
 
   app.get("/api/stats", async (_req: Request, res: Response) => {
     res.json(await getStats());
+  });
+
+  app.get("/api/dispatch/status", (_req: Request, res: Response) => {
+    res.json(getDispatchStatus());
+  });
+
+  app.post("/api/dispatch/override", (req: Request, res: Response) => {
+    const body = req.body as { enabled?: boolean };
+    const current = getDispatchStatus();
+    const newValue = typeof body.enabled === "boolean" ? body.enabled : !current.manualOverride;
+    setManualOverride(newValue);
+    log.info({ manualOverride: newValue }, "Override manual de disparo alterado via dashboard");
+    res.json({ ok: true, ...getDispatchStatus() });
   });
 
   app.post("/api/leads/:id/retry", async (req: Request, res: Response) => {
