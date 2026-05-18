@@ -7,7 +7,7 @@
  */
 
 import "dotenv/config";
-import { eq, and, like, sql } from "drizzle-orm";
+import { eq, and, like } from "drizzle-orm";
 import { db, closeConnection } from "../database/client.js";
 import { leads } from "../database/schema.js";
 import { pipelineQueue, redisConnection } from "../modules/queue/queue-manager.js";
@@ -28,6 +28,7 @@ async function main() {
 
   const disqualified = await db.select({
     id: leads.id,
+    placeId: leads.placeId,
     name: leads.name,
     city: leads.city,
     validationReason: leads.validationReason,
@@ -66,7 +67,7 @@ async function main() {
     // Reenfileira no pipeline com delay escalonado para não sobrecarregar
     await pipelineQueue.add(
       `reprocess-${lead.id}`,
-      { leadId: lead.id },
+      { leadId: lead.id, placeId: lead.placeId },
       { delay: enqueued * 500 }
     );
 
