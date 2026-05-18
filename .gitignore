@@ -4,4 +4,5 @@ dist/
 output/
 migrations/
 *.log
+*.err
 .DS_Store
