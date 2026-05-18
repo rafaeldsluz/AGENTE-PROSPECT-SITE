@@ -1,12 +1,14 @@
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import UserAgent from "user-agents";
-import { betweenActionsDelay, betweenPagesDelay, randomDelay, sleep } from "../../utils/delay.js";
+import { randomDelay, sleep } from "../../utils/delay.js";
 import { withRetry } from "../../utils/retry.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import { extractPossibleWhatsApp, normalizePhone } from "../../utils/phone.js";
 import type { BusinessRaw } from "../../types/business.types.js";
 
 const log = createModuleLogger("scraper");
+
+const BLOCKED_RESOURCES = new Set(["image", "media", "font", "stylesheet"]);
 
 interface ScraperOptions {
   maxResults: number;
@@ -44,7 +46,6 @@ export class GoogleMapsScraper {
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-blink-features=AutomationControlled",
-        "--disable-infobars",
         "--disable-dev-shm-usage",
         "--no-first-run",
         "--lang=pt-BR",
@@ -58,17 +59,25 @@ export class GoogleMapsScraper {
       locale: "pt-BR",
       timezoneId: "America/Sao_Paulo",
       viewport: { width: 1366, height: 768 },
-      extraHTTPHeaders: {
-        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-      },
+      extraHTTPHeaders: { "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8" },
     });
 
-    // Injeta scripts anti-detecção
     await this.context.addInitScript(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => undefined });
       Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
       Object.defineProperty(navigator, "languages", { get: () => ["pt-BR", "pt"] });
     });
+
+    // Bloqueia recursos desnecessários — maior ganho de velocidade
+    await this.context.route("**/*", (route) => {
+      if (BLOCKED_RESOURCES.has(route.request().resourceType())) {
+        route.abort();
+      } else {
+        route.continue();
+      }
+    });
+
+    log.info("Browser Playwright inicializado (reutilizável)");
   }
 
   async scrapeQuery(query: string, options: ScraperOptions): Promise<BusinessRaw[]> {
@@ -83,23 +92,19 @@ export class GoogleMapsScraper {
     try {
       await withRetry(
         async () => {
-          await page.goto(`https://www.google.com.br/maps/search/${encodeURIComponent(searchQuery)}`, {
-            waitUntil: "domcontentloaded",
-            timeout: 30_000,
-          });
-          // Aguarda o sidebar de resultados aparecer após a navegação
+          await page.goto(
+            `https://www.google.com.br/maps/search/${encodeURIComponent(searchQuery)}`,
+            { waitUntil: "domcontentloaded", timeout: 30_000 }
+          );
           await page.waitForSelector('[role="feed"], [role="main"]', { timeout: 20_000 });
         },
-        { maxAttempts: 3, baseDelayMs: 3_000, maxDelayMs: 15_000 }
+        { maxAttempts: 3, baseDelayMs: 3_000, maxDelayMs: 12_000 }
       );
 
-      await betweenActionsDelay();
       await this.handleCookieConsent(page);
-      await betweenActionsDelay();
 
       const listingResults = await this.extractListings(page, options.maxResults, options.city);
       results.push(...listingResults);
-
     } catch (err) {
       log.error({ query, error: String(err) }, "Erro ao buscar no Google Maps");
     } finally {
@@ -112,12 +117,12 @@ export class GoogleMapsScraper {
   private async handleCookieConsent(page: Page): Promise<void> {
     try {
       const acceptButton = page.locator('button:has-text("Aceitar tudo"), button:has-text("Accept all")');
-      if (await acceptButton.isVisible({ timeout: 3_000 })) {
+      if (await acceptButton.isVisible({ timeout: 2_000 })) {
         await acceptButton.click();
-        await sleep(1_000);
+        await sleep(500);
       }
     } catch {
-      // Sem popup de cookies, continuar normalmente
+      // sem popup de cookies
     }
   }
 
@@ -125,7 +130,6 @@ export class GoogleMapsScraper {
     const results: BusinessRaw[] = [];
     const sidebar = page.locator('[role="feed"]');
 
-    // Aguarda a lista de resultados carregar
     try {
       await sidebar.waitFor({ timeout: 10_000 });
     } catch {
@@ -133,42 +137,51 @@ export class GoogleMapsScraper {
       return results;
     }
 
-    let processedCount = 0;
+    const seenHrefs = new Set<string>();
     let scrollAttempts = 0;
-    const maxScrollAttempts = 20;
+    const maxScrollAttempts = 15;
 
-    while (processedCount < maxResults && scrollAttempts < maxScrollAttempts) {
-      // Coleta links de negócios visíveis
-      const businessLinks = await page.locator('a[href*="/maps/place/"]').all();
-      const newLinks = businessLinks.slice(processedCount);
+    while (results.length < maxResults && scrollAttempts < maxScrollAttempts) {
+      // Coleta todos os hrefs visíveis de uma vez (sem round-trip por link)
+      const hrefs = await page.evaluate(() =>
+        Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="/maps/place/"]'))
+          .map((a) => a.getAttribute("href") ?? "")
+          .filter((h) => h.includes("/maps/place/"))
+      );
 
-      for (const link of newLinks) {
-        if (processedCount >= maxResults) break;
+      const newHrefs = hrefs.filter((h) => !seenHrefs.has(h));
+      if (newHrefs.length === 0) {
+        // Nenhum item novo após scroll — fim da lista
+        break;
+      }
+
+      for (const href of newHrefs) {
+        if (results.length >= maxResults) break;
+        seenHrefs.add(href);
 
         try {
-          const href = await link.getAttribute("href");
-          if (!href || !href.includes("/maps/place/")) continue;
-
+          const link = page.locator(`a[href="${href}"]`).first();
           await link.click();
-          await betweenActionsDelay();
+
+          // Espera apenas o elemento que precisamos, sem sleep fixo
+          await page.waitForSelector('[role="main"] h1', { timeout: 8_000 });
 
           const business = await this.extractBusinessDetails(page, city);
           if (business) {
             results.push(business);
             log.debug({ name: business.name }, "Business extraído");
-            processedCount++;
           }
 
-          await betweenPagesDelay();
+          // Delay humano entre negócios: 1.5-4s (era 5-15s)
+          await randomDelay(1_500, 4_000);
         } catch (err) {
-          log.debug({ error: String(err) }, "Erro ao extrair detalhe do negócio");
+          log.debug({ href, error: String(err) }, "Erro ao extrair negócio");
         }
       }
 
-      if (processedCount < maxResults) {
-        // Scroll para carregar mais resultados
-        await sidebar.evaluate((el) => el.scrollBy(0, 500));
-        await randomDelay(1_500, 3_000);
+      if (results.length < maxResults) {
+        await sidebar.evaluate((el) => el.scrollBy(0, 600));
+        await randomDelay(800, 1_800);
         scrollAttempts++;
       }
     }
@@ -178,88 +191,98 @@ export class GoogleMapsScraper {
 
   private async extractBusinessDetails(page: Page, city: string): Promise<BusinessRaw | null> {
     try {
-      // Aguarda painel de detalhes abrir
-      await page.waitForSelector('[role="main"] h1', { timeout: 8_000 });
+      // Extrai todos os campos em uma única chamada ao browser — elimina round-trips sequenciais
+      const raw = await page.evaluate(() => {
+        const main = document.querySelector('[role="main"]');
+        if (!main) return null;
 
-      const name = await this.safeText(page, '[role="main"] h1');
-      if (!name) return null;
+        const name = main.querySelector("h1")?.textContent?.trim() ?? null;
+        if (!name) return null;
 
-      const category = await this.safeText(page, 'button[jsaction*="category"]') ??
-        await this.safeText(page, '[data-item-id*="category"]') ?? "";
+        // Categoria
+        const categoryEl =
+          main.querySelector('button[jsaction*="category"]') ??
+          main.querySelector('[data-attrid="subtitle"]');
+        const category = categoryEl?.textContent?.trim() ?? "";
 
-      const address = await this.safeText(page, '[data-item-id="address"] .Io6YTe') ??
-        await this.safeText(page, 'button[data-item-id="address"]') ?? "";
+        // Endereço — data-item-id é mais estável que classes obfuscadas
+        const addressBtn = main.querySelector<HTMLElement>(
+          '[data-item-id="address"], button[aria-label*="Endereço"], button[aria-label*="Address"]'
+        );
+        const address =
+          addressBtn?.querySelector(".Io6YTe, .rogA2c, [class*='fontBodyMedium']")?.textContent?.trim() ??
+          addressBtn?.getAttribute("aria-label")?.replace(/^[^:]+:\s*/, "").trim() ??
+          "";
 
-      const phone = await this.safeText(page, '[data-item-id*="phone"] .Io6YTe') ??
-        await this.safeText(page, 'button[data-item-id*="phone"] .rogA2c') ?? null;
+        // Telefone — tenta via texto visível, fallback no aria-label
+        const phoneBtn = main.querySelector<HTMLElement>(
+          '[data-item-id*="phone"], button[aria-label*="Telefone"], button[aria-label*="Phone"]'
+        );
+        const phone =
+          phoneBtn?.querySelector(".Io6YTe, .rogA2c, [class*='fontBodyMedium']")?.textContent?.trim() ??
+          phoneBtn?.getAttribute("aria-label")?.replace(/^[^:]+:\s*/, "").trim() ??
+          null;
 
-      const websiteEl = await page.locator('[data-item-id="authority"] .Io6YTe').first();
-      const website = await websiteEl.isVisible({ timeout: 2_000 })
-        ? await websiteEl.textContent()
-        : null;
+        // Website — texto do link (domínio visível), não o href que pode ser redirect do Google
+        const websiteLink = main.querySelector<HTMLAnchorElement>(
+          'a[data-item-id="authority"], a[aria-label*="Site"], a[aria-label*="Website"]'
+        );
+        const website =
+          websiteLink?.querySelector(".Io6YTe, [class*='fontBodyMedium']")?.textContent?.trim() ??
+          websiteLink?.textContent?.trim() ??
+          null;
 
-      const ratingText = await this.safeText(page, 'div[role="main"] span[aria-hidden="true"].ceNzKf') ??
-        await this.safeText(page, 'span.MW4etd') ?? null;
+        // Rating — usa aria-label que é mais estável ("4,3 estrelas")
+        const ratingEl = main.querySelector<HTMLElement>(
+          '[aria-label*="estrela"], [aria-label*="star"], span.ceNzKf, span.MW4etd'
+        );
+        const ratingRaw =
+          ratingEl?.getAttribute("aria-label")?.match(/[\d,\.]+/)?.[0] ??
+          ratingEl?.textContent?.trim() ??
+          null;
 
-      const reviewText = await this.safeText(page, 'button[jsaction*="reviewSort"] span') ?? null;
+        // Contagem de avaliações
+        const reviewBtn = main.querySelector<HTMLElement>('button[aria-label*="avaliações"], button[aria-label*="reviews"], button[jsaction*="reviewSort"]');
+        const reviewRaw =
+          reviewBtn?.getAttribute("aria-label")?.match(/[\d.,]+/)?.[0] ??
+          reviewBtn?.textContent?.trim() ??
+          null;
 
-      const rating = ratingText ? parseFloat(ratingText.replace(",", ".")) : null;
-      const reviewCount = reviewText ? parseInt(reviewText.replace(/\D/g, "")) : null;
+        // PlaceId via URL canônica
+        const canonicalUrl = window.location.href;
+        const placeIdMatch = canonicalUrl.match(/0x[0-9a-fA-F]+:0x[0-9a-fA-F]+/);
+        const placeId = placeIdMatch?.[0] ?? canonicalUrl.match(/place\/([^/]+)/)?.[1] ?? "";
 
-      // Fotos
-      const photos: string[] = [];
-      const photoImgs = await page.locator('button[jsaction*="heroHeader"] img, div[data-photo-index] img').all();
-      for (const img of photoImgs.slice(0, 5)) {
-        const src = await img.getAttribute("src");
-        if (src && src.startsWith("http")) photos.push(src);
-      }
+        return { name, category, address, phone, website, ratingRaw, reviewRaw, placeId, canonicalUrl };
+      });
 
-      // Placeadd URL atual para extrair placeId
-      const currentUrl = page.url();
-      const placeIdMatch = currentUrl.match(/place\/([^/]+)/);
-      const placeId = placeIdMatch?.[1] ?? `${normalizePhone(phone ?? "")}${Date.now()}`;
+      if (!raw) return null;
 
-      // Logo (primeira imagem do perfil)
-      const logoEl = await page.locator('img[decoding="async"][class*="YQ4gaf"]').first();
-      const logoUrl = await logoEl.isVisible({ timeout: 2_000 })
-        ? await logoEl.getAttribute("src")
-        : null;
-
-      const normalizedPhone = phone ? normalizePhone(phone) : null;
-      const whatsapp = phone ? extractPossibleWhatsApp(normalizedPhone ?? phone) : null;
+      const normalizedPhone = raw.phone ? normalizePhone(raw.phone) : null;
+      const whatsapp = normalizedPhone ? extractPossibleWhatsApp(normalizedPhone) : null;
+      const rating = raw.ratingRaw ? parseFloat(raw.ratingRaw.replace(",", ".")) : null;
+      const reviewCount = raw.reviewRaw ? parseInt(raw.reviewRaw.replace(/\D/g, "")) : null;
 
       return {
-        placeId,
-        name: name.trim(),
-        category: category.trim(),
-        address: address.trim(),
+        placeId: raw.placeId || `${normalizedPhone ?? ""}${Date.now()}`,
+        name: raw.name.trim(),
+        category: raw.category.trim(),
+        address: raw.address.trim(),
         city,
         phone: normalizedPhone,
         whatsapp: whatsapp ?? normalizedPhone,
-        website: website?.trim() ?? null,
-        rating: isNaN(rating ?? NaN) ? null : rating,
-        reviewCount: isNaN(reviewCount ?? NaN) ? null : reviewCount,
-        photos,
-        logoUrl: logoUrl ?? null,
+        website: raw.website?.trim() ?? null,
+        rating: rating !== null && !isNaN(rating) ? rating : null,
+        reviewCount: reviewCount !== null && !isNaN(reviewCount) ? reviewCount : null,
+        photos: [],
+        logoUrl: null,
         instagram: null,
         facebook: null,
-        googleMapsUrl: currentUrl,
+        googleMapsUrl: raw.canonicalUrl,
         scrapedAt: new Date(),
       };
     } catch (err) {
       log.debug({ error: String(err) }, "Erro ao extrair detalhes");
-      return null;
-    }
-  }
-
-  private async safeText(page: Page, selector: string): Promise<string | null> {
-    try {
-      const el = page.locator(selector).first();
-      if (await el.isVisible({ timeout: 2_000 })) {
-        return (await el.textContent())?.trim() ?? null;
-      }
-      return null;
-    } catch {
       return null;
     }
   }
