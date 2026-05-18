@@ -11,6 +11,8 @@
     "migrate": "drizzle-kit push",
     "studio": "drizzle-kit studio",
     "install:browsers": "playwright install chromium",
+    "reprocess": "tsx src/scripts/reprocess-disqualified.ts",
+    "reprocess:all": "tsx src/scripts/reprocess-disqualified.ts --all",
     "test": "vitest run",
     "test:watch": "vitest"
   },
