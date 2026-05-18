@@ -82,10 +82,14 @@ export class GoogleMapsScraper {
 
     try {
       await withRetry(
-        () => page.goto(`https://www.google.com.br/maps/search/${encodeURIComponent(searchQuery)}`, {
-          waitUntil: "networkidle",
-          timeout: 30_000,
-        }),
+        async () => {
+          await page.goto(`https://www.google.com.br/maps/search/${encodeURIComponent(searchQuery)}`, {
+            waitUntil: "domcontentloaded",
+            timeout: 30_000,
+          });
+          // Aguarda o sidebar de resultados aparecer após a navegação
+          await page.waitForSelector('[role="feed"], [role="main"]', { timeout: 20_000 });
+        },
         { maxAttempts: 3, baseDelayMs: 3_000, maxDelayMs: 15_000 }
       );
 
