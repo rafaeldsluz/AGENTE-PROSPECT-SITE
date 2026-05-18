@@ -61,6 +61,29 @@ async function getStats(queue: Queue) {
   return { waiting, active, completed, failed };
 }
 
+export async function enqueueScrapeJobs(
+  targetCities: string[],
+  _targetNiches: string[],
+  maxLeadsPerRun: number,
+  queries: string[],
+): Promise<number> {
+  let jobCount = 0;
+  for (const city of targetCities) {
+    for (const query of queries) {
+      const jobId = `scrape-${city}-${query}-${Date.now()}-${jobCount}`;
+      const delay = jobCount * 30_000;
+      await scrapeQueue.add(jobId, {
+        city,
+        niche: query.split(" ")[0] ?? query,
+        searchQuery: query,
+        maxResults: Math.ceil(maxLeadsPerRun / queries.length),
+      }, { delay });
+      jobCount++;
+    }
+  }
+  return jobCount;
+}
+
 export async function getDispatchFailedJobs(limit = 10) {
   const jobs = await dispatchQueue.getFailed(0, limit - 1);
   return jobs.map((j) => ({

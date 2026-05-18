@@ -1,10 +1,12 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import { type Server } from "http";
+import { resolve as resolvePath } from "path";
 import { desc } from "drizzle-orm";
 import { db } from "../database/client.js";
 import { leads, type Lead } from "../database/schema.js";
 import { leadRepository } from "../database/repositories/lead.repository.js";
-import { getQueueStats, pipelineQueue, getDispatchFailedJobs } from "../modules/queue/queue-manager.js";
+import { getQueueStats, pipelineQueue, getDispatchFailedJobs, enqueueScrapeJobs } from "../modules/queue/queue-manager.js";
+import { getNicheQueries } from "../modules/scraper/google-maps.scraper.js";
 import { metricsRegistry, updatePrometheusMetrics } from "../metrics/index.js";
 import { createModuleLogger } from "../utils/logger.js";
 import { config } from "../config/index.js";
@@ -215,7 +217,12 @@ function getDashboardHtml(): string {
           <p class="text-xs mt-0.5" style="color:var(--text-secondary)">Dashboard de Monitoramento em Tempo Real</p>
         </div>
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3">
+        <button id="scrape-btn" onclick="startScraping()"
+          class="dispatch-btn inactive"
+          style="background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.4);color:#a5b4fc;font-size:12px">
+          🔍 Iniciar Scraping
+        </button>
         <div class="flex items-center gap-2">
           <div class="live-dot off" id="live-dot"></div>
           <span class="text-xs font-medium" style="color:var(--text-secondary)" id="live-text">Conectando...</span>
@@ -445,6 +452,30 @@ function scoreBar(v) {
     <div class="score-bar" style="width:48px"><div class="score-fill" style="width:\${p}%;background:\${c}"></div></div>
   </div>\`;
 }
+
+// ── Scraping manual ──────────────────────────────────────────────────────
+function startScraping() {
+  const btn = document.getElementById('scrape-btn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Enfileirando...';
+  fetch('/api/scrape/start', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        btn.textContent = '✅ ' + d.jobsEnqueued + ' jobs';
+        showToast('🔍', 'Scraping iniciado', d.jobsEnqueued + ' queries enfileiradas', false);
+      } else {
+        btn.textContent = '❌ Erro';
+      }
+      setTimeout(() => { btn.textContent = '🔍 Iniciar Scraping'; btn.disabled = false; }, 4000);
+    })
+    .catch(() => {
+      btn.textContent = '❌ Erro';
+      setTimeout(() => { btn.textContent = '🔍 Iniciar Scraping'; btn.disabled = false; }, 3000);
+    });
+}
+window.startScraping = startScraping;
 
 // ── Modal de detalhes do lead ─────────────────────────────────────────────
 function openLead(id) {
@@ -869,6 +900,15 @@ export function createDashboardServer(port = 3000): Server {
     res.json(await getStats());
   });
 
+  app.post("/api/scrape/start", async (_req: Request, res: Response) => {
+    const { targetCities, targetNiches, maxLeadsPerRun } = config.scraping;
+    const queries = getNicheQueries(targetNiches);
+    const total = await enqueueScrapeJobs(targetCities, targetNiches, maxLeadsPerRun, queries);
+    _cachedStats = null;
+    log.info({ total }, "Scraping iniciado manualmente via dashboard");
+    res.json({ ok: true, jobsEnqueued: total });
+  });
+
   app.get("/api/leads/:id", async (req: Request, res: Response) => {
     const rawId = req.params["id"];
     const id = Array.isArray(rawId) ? rawId[0] : rawId;
@@ -884,7 +924,7 @@ export function createDashboardServer(port = 3000): Server {
     if (!id) { res.status(400).end(); return; }
     const lead = await leadRepository.findById(id);
     if (!lead?.screenshotPath) { res.status(404).end(); return; }
-    res.sendFile(lead.screenshotPath, { root: "/" });
+    res.sendFile(resolvePath(lead.screenshotPath));
   });
 
   app.get("/api/dispatch/status", (_req: Request, res: Response) => {

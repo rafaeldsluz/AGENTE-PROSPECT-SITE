@@ -214,6 +214,12 @@ export class GoogleMapsScraper {
           const link = page.locator(`a[href="${href}"]`).first();
           await link.click();
 
+          // Aguarda a URL mudar para uma página de place específico (evita capturar o h1 "Resultados" da lista)
+          await page.waitForFunction(
+            () => window.location.href.includes("/maps/place/"),
+            { timeout: 8_000 }
+          ).catch(() => {}); // se não mudar, extractBusinessDetails vai retornar null pelo guard interno
+
           await page.waitForSelector('[role="main"] h1', { timeout: 8_000 });
           // Aguarda elementos async (telefone, fotos, reviews) carregarem
           await sleep(700);
@@ -253,6 +259,9 @@ export class GoogleMapsScraper {
       const raw = await page.evaluate(() => {
         const main = document.querySelector('[role="main"]');
         if (!main) return null;
+
+        // Guard: só processa páginas de place específico, não a lista de resultados
+        if (!window.location.href.includes("/maps/place/")) return null;
 
         const name = main.querySelector("h1")?.textContent?.trim() ?? null;
         if (!name) return null;
