@@ -1,4 +1,3 @@
-import axios from "axios";
 import {
   extractDomain,
   isSocialOrDirectoryDomain,
@@ -60,11 +59,14 @@ export class WebsiteValidator {
       }
     }
 
-    // ── Check 3: Domínios candidatos baseados no nome da empresa ─────────
+    // ── Check 3: Domínios .com.br baseados no nome da empresa ────────────
+    // Só verifica TLD brasileiro para evitar falsos positivos em domínios
+    // .com genéricos que pertencem a empresas diferentes em outros países
     if (!checks.some((c) => c.result)) {
-      const candidates = generateDomainCandidates(business.name);
-      for (const candidate of candidates.slice(0, 3)) {
-        await randomDelay(500, 1_500);
+      const candidates = generateDomainCandidates(business.name)
+        .filter((c) => c.endsWith(".com.br"));
+      for (const candidate of candidates.slice(0, 2)) {
+        await randomDelay(300, 800);
         const active = await isDomainActive(candidate);
         if (active) {
           const accessible = await isUrlAccessible(candidate);
@@ -73,24 +75,11 @@ export class WebsiteValidator {
               source: "domain_candidate",
               result: true,
               detail: `Domínio candidato ativo: ${candidate}`,
-              weight: 0.7,
+              weight: 0.65,
             });
             break;
           }
         }
-      }
-    }
-
-    // ── Check 4: Busca Google pelo nome da empresa ───────────────────────
-    if (!checks.some((c) => c.result)) {
-      const googleResult = await this.searchGoogleForWebsite(business.name, business.city);
-      if (googleResult) {
-        checks.push({
-          source: "google_search",
-          result: true,
-          detail: `Site encontrado via Google: ${googleResult}`,
-          weight: 0.75,
-        });
       }
     }
 
@@ -132,68 +121,31 @@ export class WebsiteValidator {
 
   private async extractInstagramBioLink(instagramUrl: string): Promise<string | null> {
     try {
-      // Tenta obter o username e verificar a bio via scraping leve
       const usernameMatch = instagramUrl.match(/instagram\.com\/([^/?]+)/);
       if (!usernameMatch) return null;
-
       const username = usernameMatch[1];
       if (!username) return null;
 
-      // Usa a API não oficial do Instagram para obter dados básicos
-      const response = await axios.get(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`, {
-        timeout: 8_000,
-        headers: {
-          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X)",
-          "Accept": "application/json",
-          "x-ig-app-id": "936619743392459",
-        },
-        validateStatus: (s) => s < 500,
-      });
+      const response = await import("axios").then((m) =>
+        m.default.get(
+          `https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
+          {
+            timeout: 8_000,
+            headers: {
+              "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X)",
+              "Accept": "application/json",
+              "x-ig-app-id": "936619743392459",
+            },
+            validateStatus: (s: number) => s < 500,
+          }
+        )
+      );
 
       if (response.status === 200 && response.data?.data?.user?.external_url) {
         return response.data.data.user.external_url as string;
       }
     } catch {
-      // Ignorar erros silenciosamente - Instagram protege contra scraping
-    }
-    return null;
-  }
-
-  private async searchGoogleForWebsite(companyName: string, city: string): Promise<string | null> {
-    try {
-      const query = `"${companyName}" "${city}" site`;
-      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=5`;
-
-      const response = await axios.get(searchUrl, {
-        timeout: 10_000,
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "Accept-Language": "pt-BR,pt;q=0.9",
-        },
-        validateStatus: (s) => s < 500,
-      });
-
-      if (response.status !== 200) return null;
-
-      const html = response.data as string;
-
-      // Procura por links de resultados orgânicos que não sejam sociais/diretórios
-      const linkRegex = /href="(https?:\/\/[^"]+)"/g;
-      let match: RegExpExecArray | null;
-
-      while ((match = linkRegex.exec(html)) !== null) {
-        const url = match[1];
-        if (!url) continue;
-
-        const domain = extractDomain(url);
-        if (!isSocialOrDirectoryDomain(domain) && !domain.includes("google.")) {
-          if (await isUrlAccessible(url)) {
-            return url;
-          }
-        }
-      }
-    } catch {
-      // Ignorar erros de busca Google
+      // Instagram protege contra scraping
     }
     return null;
   }
