@@ -61,6 +61,17 @@ async function getStats(queue: Queue) {
   return { waiting, active, completed, failed };
 }
 
+export async function getDispatchFailedJobs(limit = 10) {
+  const jobs = await dispatchQueue.getFailed(0, limit - 1);
+  return jobs.map((j) => ({
+    jobId: j.id,
+    companyName: j.data.companyName,
+    whatsapp: j.data.whatsapp,
+    reason: j.failedReason ?? "Motivo desconhecido",
+    failedAt: j.finishedOn ? new Date(j.finishedOn).toISOString() : null,
+  }));
+}
+
 export async function closeQueues(): Promise<void> {
   await Promise.all([
     scrapeQueue.close(),

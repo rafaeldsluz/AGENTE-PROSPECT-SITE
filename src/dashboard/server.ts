@@ -4,7 +4,7 @@ import { desc } from "drizzle-orm";
 import { db } from "../database/client.js";
 import { leads, type Lead } from "../database/schema.js";
 import { leadRepository } from "../database/repositories/lead.repository.js";
-import { getQueueStats, pipelineQueue } from "../modules/queue/queue-manager.js";
+import { getQueueStats, pipelineQueue, getDispatchFailedJobs } from "../modules/queue/queue-manager.js";
 import { metricsRegistry, updatePrometheusMetrics } from "../metrics/index.js";
 import { createModuleLogger } from "../utils/logger.js";
 import { config } from "../config/index.js";
@@ -99,6 +99,7 @@ interface StatsSnapshot {
   queueStats: Awaited<ReturnType<typeof getQueueStats>>;
   recentLeads: Lead[];
   failedDispatches: Awaited<ReturnType<typeof dispatchRepository.getRecentFailed>>;
+  dispatchQueueFailures: Awaited<ReturnType<typeof getDispatchFailedJobs>>;
   total: number;
   timestamp: number;
 }
@@ -110,16 +111,17 @@ const CACHE_TTL_MS = 1_500;
 async function getStats(): Promise<StatsSnapshot> {
   if (_cachedStats !== null && Date.now() < _cacheExpiresAt) return _cachedStats;
 
-  const [dbStats, queueStats, recentLeads, failedDispatches] = await Promise.all([
+  const [dbStats, queueStats, recentLeads, failedDispatches, dispatchQueueFailures] = await Promise.all([
     leadRepository.countByStatus(),
     getQueueStats(),
     db.select().from(leads).orderBy(desc(leads.updatedAt)).limit(50),
     dispatchRepository.getRecentFailed(10),
+    getDispatchFailedJobs(10),
   ]);
 
   const total = Object.values(dbStats).reduce((a, b) => a + b, 0);
 
-  _cachedStats = { dbStats, queueStats, recentLeads, failedDispatches, total, timestamp: Date.now() };
+  _cachedStats = { dbStats, queueStats, recentLeads, failedDispatches, dispatchQueueFailures, total, timestamp: Date.now() };
   _cacheExpiresAt = Date.now() + CACHE_TTL_MS;
 
   return _cachedStats;
@@ -245,33 +247,33 @@ function getDashboardHtml(): string {
 
     <!-- Stat Cards -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      <div class="glass p-4 space-y-1.5">
+      <div class="glass p-4 space-y-1.5 cursor-pointer" onclick="setKpiFilter('')" title="Ver todos">
         <p class="text-xs font-medium uppercase tracking-widest" style="color:var(--text-muted)">Total</p>
         <p class="stat-value text-white" id="s-total">—</p>
         <p class="text-xs" style="color:var(--text-secondary)">leads coletados</p>
       </div>
-      <div class="glass p-4 space-y-1.5"
+      <div class="glass p-4 space-y-1.5 cursor-pointer" onclick="setKpiFilter('screenshot_ready')" title="Ver qualificados"
            style="background:linear-gradient(135deg,rgba(99,102,241,0.08) 0%,var(--surface) 70%);border-color:rgba(99,102,241,0.2)">
         <p class="text-xs font-medium uppercase tracking-widest" style="color:#6366f1">Qualificados</p>
         <p class="stat-value" style="color:#818cf8" id="s-qualified">—</p>
         <p class="text-xs" id="s-qual-rate" style="color:var(--text-secondary)">taxa de qualificação</p>
       </div>
-      <div class="glass p-4 space-y-1.5">
+      <div class="glass p-4 space-y-1.5 cursor-pointer" onclick="setKpiFilter('screenshot_ready')" title="Ver prontos para envio">
         <p class="text-xs font-medium uppercase tracking-widest" style="color:var(--text-muted)">Fila de Envio</p>
         <p class="stat-value" style="color:#10b981" id="s-ready">—</p>
         <p class="text-xs" style="color:var(--text-secondary)">prontos para disparar</p>
       </div>
-      <div class="glass p-4 space-y-1.5">
+      <div class="glass p-4 space-y-1.5 cursor-pointer" onclick="setKpiFilter('dispatched')" title="Ver enviados">
         <p class="text-xs font-medium uppercase tracking-widest" style="color:var(--text-muted)">Enviados</p>
         <p class="stat-value" style="color:#06b6d4" id="s-dispatched">—</p>
         <p class="text-xs" style="color:var(--text-secondary)">mensagens disparadas</p>
       </div>
-      <div class="glass p-4 space-y-1.5">
+      <div class="glass p-4 space-y-1.5 cursor-pointer" onclick="setKpiFilter('replied')" title="Ver respostas">
         <p class="text-xs font-medium uppercase tracking-widest" style="color:var(--text-muted)">Responderam</p>
         <p class="stat-value" style="color:#22c55e" id="s-replied">—</p>
         <p class="text-xs" id="s-reply-rate" style="color:var(--text-secondary)">taxa de resposta</p>
       </div>
-      <div class="glass p-4 space-y-1.5">
+      <div class="glass p-4 space-y-1.5 cursor-pointer" onclick="setKpiFilter('disqualified')" title="Ver descartados">
         <p class="text-xs font-medium uppercase tracking-widest" style="color:var(--text-muted)">Descartados</p>
         <p class="stat-value" style="color:#64748b" id="s-disqualified">—</p>
         <p class="text-xs" style="color:var(--text-secondary)">sem site ou score baixo</p>
@@ -338,6 +340,26 @@ function getDashboardHtml(): string {
         <p class="text-4xl mb-2">🔍</p>
         <p class="text-sm font-medium" style="color:var(--text-secondary)">Nenhum lead encontrado</p>
         <p class="text-xs mt-1" style="color:var(--text-muted)">Inicie o sistema para começar a prospecção</p>
+      </div>
+    </div>
+
+    <!-- Modal de detalhes do lead -->
+    <div id="lead-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);padding:24px;overflow-y:auto" onclick="if(event.target===this)closeLead()">
+      <div class="glass" style="max-width:680px;margin:0 auto;padding:0;overflow:hidden">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:between;gap:12px">
+          <div style="flex:1;min-width:0">
+            <div id="modal-name" class="text-lg font-bold text-white leading-tight"></div>
+            <div id="modal-meta" class="text-xs mt-1" style="color:var(--text-secondary)"></div>
+          </div>
+          <button onclick="closeLead()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text-secondary);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;flex-shrink:0">✕ Fechar</button>
+        </div>
+        <div style="padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:16px" id="modal-stats"></div>
+        <div style="padding:0 24px 24px">
+          <p class="text-xs font-semibold uppercase tracking-widest mb-3" style="color:var(--text-muted)">Preview da Landing Page</p>
+          <div id="modal-preview" style="border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--surface-2);min-height:200px;display:flex;align-items:center;justify-content:center">
+            <span style="color:var(--text-muted);font-size:13px">Carregando...</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -424,6 +446,66 @@ function scoreBar(v) {
   </div>\`;
 }
 
+// ── Modal de detalhes do lead ─────────────────────────────────────────────
+function openLead(id) {
+  const modal = document.getElementById('lead-modal');
+  if (!modal) return;
+  modal.style.display = '';
+  document.getElementById('modal-name').textContent = 'Carregando...';
+  document.getElementById('modal-meta').textContent = '';
+  document.getElementById('modal-stats').innerHTML = '';
+  document.getElementById('modal-preview').innerHTML = '<span style="color:var(--text-muted);font-size:13px">Carregando...</span>';
+  fetch('/api/leads/' + id)
+    .then(r => r.json())
+    .then(l => {
+      const nicheIcon = NICHE_ICONS[l.niche] || '📦';
+      document.getElementById('modal-name').textContent = l.name;
+      document.getElementById('modal-meta').textContent =
+        (l.city || '') + (l.niche ? '  ·  ' + nicheIcon + ' ' + l.niche : '') +
+        (l.score != null ? '  ·  Score ' + Math.round(l.score) : '');
+      const items = [
+        ['📞 Telefone', l.phone || l.whatsapp || '—'],
+        ['🏙️ Cidade', l.city || '—'],
+        [nicheIcon + ' Nicho', l.niche || '—'],
+        ['⭐ Rating', l.rating ? l.rating + ' (' + (l.reviewCount || 0) + ' avaliações)' : '—'],
+        ['📊 Score', l.score != null ? Math.round(l.score) + ' / 100' : '—'],
+        ['📅 Coletado', fmtDate(l.scrapedAt)],
+        ['📌 Status', STATUS_LABELS[l.status] || l.status],
+        ['🔗 Instagram', l.instagram ? '@' + (l.instagram.split('/').filter(Boolean).pop() || '—') : '—'],
+      ];
+      document.getElementById('modal-stats').innerHTML = items.map(([k,v]) =>
+        \`<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div class="text-xs" style="color:var(--text-muted)">\${k}</div>
+          <div class="text-sm font-medium text-white mt-0.5" style="word-break:break-all">\${esc(String(v))}</div>
+        </div>\`
+      ).join('');
+      const preview = document.getElementById('modal-preview');
+      if (l.screenshotPath) {
+        preview.innerHTML = \`<img src="/api/leads/\${l.id}/screenshot" style="width:100%;display:block" alt="Landing page" onerror="this.parentNode.innerHTML='<span style=\\'color:var(--text-muted);font-size:13px;padding:20px\\'>Imagem não disponível</span>'">\`;
+      } else {
+        preview.innerHTML = '<span style="color:var(--text-muted);font-size:13px;padding:20px">Screenshot ainda não gerado</span>';
+      }
+    })
+    .catch(() => { document.getElementById('modal-name').textContent = 'Erro ao carregar'; });
+}
+function closeLead() {
+  const modal = document.getElementById('lead-modal');
+  if (modal) modal.style.display = 'none';
+}
+window.openLead = openLead;
+window.closeLead = closeLead;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLead(); });
+
+// ── KPIs clicáveis (filtram tabela) ──────────────────────────────────────
+function setKpiFilter(status) {
+  const sel = document.getElementById('filter-status');
+  if (!sel) return;
+  sel.value = status;
+  filterLeads();
+  document.getElementById('leads-table')?.closest('.glass')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+window.setKpiFilter = setKpiFilter;
+
 // ── Toast ─────────────────────────────────────────────────────────────────
 function showToast(icon, title, sub, isError) {
   const c = document.getElementById('toast-container');
@@ -459,18 +541,36 @@ function detectNewQualified(leads) {
 
 // ── Falhas de disparo ─────────────────────────────────────────────────────
 function renderFailures(data) {
-  const failures = data.failedDispatches || [];
+  // Combina falhas do banco (pós-tentativa) + falhas BullMQ (pré-tentativa)
+  const dbFails = (data.failedDispatches || []).map(f => ({
+    who: f.whatsapp,
+    when: f.sentAt,
+    reason: f.errorMessage || 'Erro desconhecido',
+  }));
+  const qFails = (data.dispatchQueueFailures || []).map(f => ({
+    who: f.companyName + ' (' + f.whatsapp + ')',
+    when: f.failedAt,
+    reason: f.reason,
+  }));
+  // Remove duplicatas simples (mesma reason + who)
+  const seen = new Set();
+  const all = [...dbFails, ...qFails].filter(f => {
+    const k = f.who + '|' + f.reason;
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+
   const section = document.getElementById('failures-section');
-  const tbody = document.getElementById('failures-table');
-  const badge = document.getElementById('failures-count');
+  const tbody   = document.getElementById('failures-table');
+  const badge   = document.getElementById('failures-count');
   if (!section || !tbody) return;
-  if (!failures.length) { section.style.display = 'none'; return; }
+  if (!all.length) { section.style.display = 'none'; return; }
   section.style.display = '';
-  if (badge) badge.textContent = failures.length + ' falha' + (failures.length > 1 ? 's' : '');
-  tbody.innerHTML = failures.map(f => \`<tr class="table-row border-b" style="border-color:rgba(255,255,255,0.04)">
-    <td class="py-3 pr-4"><span class="font-mono text-xs" style="color:var(--text-secondary)">\${esc(f.whatsapp)}</span></td>
-    <td class="py-3 pr-4"><span class="text-xs font-mono" style="color:var(--text-muted)">\${fmtDate(f.sentAt)}</span></td>
-    <td class="py-3"><span class="text-xs px-2 py-1 rounded" style="background:rgba(239,68,68,0.1);color:#ef4444">\${esc(f.errorMessage || 'Erro desconhecido')}</span></td>
+  if (badge) badge.textContent = all.length + ' falha' + (all.length !== 1 ? 's' : '');
+  tbody.innerHTML = all.map(f => \`<tr class="table-row border-b" style="border-color:rgba(255,255,255,0.04)">
+    <td class="py-3 pr-4"><span class="text-xs font-mono" style="color:var(--text-secondary)">\${esc(f.who)}</span></td>
+    <td class="py-3 pr-4"><span class="text-xs font-mono" style="color:var(--text-muted)">\${fmtDate(f.when)}</span></td>
+    <td class="py-3"><span class="text-xs px-2 py-1 rounded" style="background:rgba(239,68,68,0.1);color:#ef4444">\${esc(f.reason)}</span></td>
   </tr>\`).join('');
 }
 
@@ -648,9 +748,16 @@ function filterLeads() {
   }
   if (empty) empty.classList.add('hidden');
   if (tbody) tbody.innerHTML = filtered.map(l => {
+    const canOpen = ['screenshot_ready','dispatched','replied'].includes(l.status);
     const canRetry = RETRYABLE.has(l.status);
+    const viewBtn = canOpen
+      ? \`<button class="retry-btn" onclick="openLead('\${esc(l.id)}')" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);color:#a5b4fc">🔍 Ver</button>\`
+      : '';
     const retryBtn = canRetry
       ? \`<button class="retry-btn" data-retry="\${esc(l.id)}" onclick="retryLead('\${esc(l.id)}')">↺ retry</button>\`
+      : '';
+    const actions = (viewBtn || retryBtn)
+      ? \`<div style="display:flex;gap:4px;flex-wrap:wrap">\${viewBtn}\${retryBtn}</div>\`
       : '<span style="color:var(--text-muted);font-size:11px">—</span>';
     return \`<tr class="table-row border-b" style="border-color:rgba(255,255,255,0.04)">
       <td class="py-3 pr-4">
@@ -662,7 +769,7 @@ function filterLeads() {
       <td class="py-3 pr-4">\${scoreBar(l.score)}</td>
       <td class="py-3 pr-4">\${statusBadge(l.status)}</td>
       <td class="py-3 pr-4 hide-mobile"><span class="text-xs font-mono" style="color:var(--text-muted)">\${fmtDate(l.scrapedAt)}</span></td>
-      <td class="py-3">\${retryBtn}</td>
+      <td class="py-3">\${actions}</td>
     </tr>\`;
   }).join('');
 }
@@ -760,6 +867,24 @@ export function createDashboardServer(port = 3000): Server {
 
   app.get("/api/stats", async (_req: Request, res: Response) => {
     res.json(await getStats());
+  });
+
+  app.get("/api/leads/:id", async (req: Request, res: Response) => {
+    const rawId = req.params["id"];
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
+    if (!id) { res.status(400).json({ ok: false }); return; }
+    const lead = await leadRepository.findById(id);
+    if (!lead) { res.status(404).json({ ok: false }); return; }
+    res.json(lead);
+  });
+
+  app.get("/api/leads/:id/screenshot", async (req: Request, res: Response) => {
+    const rawId = req.params["id"];
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
+    if (!id) { res.status(400).end(); return; }
+    const lead = await leadRepository.findById(id);
+    if (!lead?.screenshotPath) { res.status(404).end(); return; }
+    res.sendFile(lead.screenshotPath, { root: "/" });
   });
 
   app.get("/api/dispatch/status", (_req: Request, res: Response) => {

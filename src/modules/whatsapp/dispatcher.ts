@@ -37,6 +37,14 @@ export class WhatsAppDispatcher {
     const isConnected = await evolutionClient.checkConnection();
     if (!isConnected) {
       log.error("Evolution API não está conectada");
+      await dispatchRepository.create({
+        leadId,
+        whatsapp: phone,
+        message,
+        screenshotPath,
+        status: "failed",
+        errorMessage: "WhatsApp desconectado — verifique a conexão na Evolution API",
+      });
       throw new Error("WhatsApp desconectado");
     }
 
