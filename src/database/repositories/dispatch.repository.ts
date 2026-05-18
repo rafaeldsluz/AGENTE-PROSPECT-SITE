@@ -33,10 +33,11 @@ export class DispatchRepository {
 
   async hasDispatchedToLead(leadId: string): Promise<boolean> {
     const result = await db
-      .select({ count: sql<number>`count(*)` })
+      .select({ one: sql<number>`1` })
       .from(dispatches)
-      .where(eq(dispatches.leadId, leadId));
-    return (Number(result[0]?.count ?? 0)) > 0;
+      .where(eq(dispatches.leadId, leadId))
+      .limit(1);
+    return result.length > 0;
   }
 
   async updateStatus(id: string, status: string, errorMessage?: string): Promise<void> {

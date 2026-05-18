@@ -11,9 +11,81 @@ import { templateEngine } from "../../renderer/template-engine.js";
 import { screenshotGenerator } from "../../screenshot/screenshot-generator.js";
 import { mockupComposer } from "../../screenshot/mockup-composer.js";
 import type { PipelineJobData, DispatchJobData } from "../../../types/queue.types.js";
-import type { BusinessRaw, BusinessValidated } from "../../../types/business.types.js";
+import type { BusinessRaw, BusinessValidated, BusinessEnriched } from "../../../types/business.types.js";
+import type { Lead } from "../../../database/schema.js";
 
 const log = createModuleLogger("worker:pipeline");
+
+// ── Stage helpers ─────────────────────────────────────────────────────────────
+
+async function stageValidate(lead: Lead): Promise<
+  | { ok: true; business: BusinessValidated }
+  | { ok: false; reason: string }
+> {
+  const businessRaw: BusinessRaw = {
+    placeId: lead.placeId,
+    name: lead.name,
+    category: lead.category,
+    address: lead.address,
+    city: lead.city,
+    phone: lead.phone ?? null,
+    whatsapp: lead.whatsapp ?? null,
+    website: lead.website ?? null,
+    rating: lead.rating ?? null,
+    reviewCount: lead.reviewCount ?? null,
+    photos: (lead.photos as string[]) ?? [],
+    logoUrl: lead.logoUrl ?? null,
+    instagram: lead.instagram ?? null,
+    facebook: lead.facebook ?? null,
+    googleMapsUrl: lead.googleMapsUrl,
+    scrapedAt: lead.scrapedAt,
+  };
+
+  const validation = await websiteValidator.validate(businessRaw);
+  await leadRepository.updateValidation(lead.id, { ...businessRaw, validation });
+
+  if (validation.hasOwnWebsite) {
+    return { ok: false, reason: `possui site próprio: ${validation.websiteUrl ?? "desconhecido"}` };
+  }
+
+  return { ok: true, business: { ...businessRaw, validation } };
+}
+
+async function stageEnrich(
+  leadId: string,
+  business: BusinessValidated
+): Promise<{ ok: true; enriched: BusinessEnriched } | { ok: false; reason: string }> {
+  const nicheResult = await nicheClassifier.classify(business.name, business.category);
+  const enriched = scoringEngine.score(business, nicheResult.niche, nicheResult.confidence);
+  await leadRepository.updateEnrichment(leadId, enriched);
+
+  if (enriched.score < 20) {
+    await leadRepository.updateStatus(leadId, "disqualified");
+    return { ok: false, reason: `score insuficiente: ${enriched.score}` };
+  }
+
+  const targetPhone = enriched.whatsapp ?? enriched.phone;
+  if (!targetPhone) {
+    await leadRepository.updateStatus(leadId, "disqualified");
+    return { ok: false, reason: "sem telefone" };
+  }
+
+  return { ok: true, enriched };
+}
+
+async function stageRenderAndCapture(leadId: string, enriched: BusinessEnriched): Promise<string> {
+  const templateData = await contentPersonalizer.personalize(enriched);
+  const renderedPage = await templateEngine.render(templateData);
+  await leadRepository.updatePagePath(leadId, renderedPage.filePath);
+
+  const screenshot = await screenshotGenerator.capture(renderedPage.filePath, enriched.name);
+  const mockupPath = await mockupComposer.compose(screenshot.filePath, enriched.name, "browser");
+  await leadRepository.updateScreenshotPath(leadId, mockupPath);
+
+  return mockupPath;
+}
+
+// ── Worker ───────────────────────────────────────────────────────────────────
 
 export function createPipelineWorker(): Worker {
   const worker = new Worker<PipelineJobData>(
@@ -25,90 +97,40 @@ export function createPipelineWorker(): Worker {
       const lead = await leadRepository.findById(leadId);
       if (!lead) throw new Error(`Lead ${leadId} não encontrado`);
 
-      // ── Etapa 1: Validação de site ───────────────────────────────────────
+      // ── Stage 1: Website validation ──────────────────────────────────────
       await job.updateProgress(10);
-      log.debug({ name: lead.name }, "Etapa 1: Validando site");
+      log.debug({ name: lead.name }, "Stage 1/4 — validação de site");
 
-      const businessRaw: BusinessRaw = {
-        placeId: lead.placeId,
-        name: lead.name,
-        category: lead.category,
-        address: lead.address,
-        city: lead.city,
-        phone: lead.phone ?? null,
-        whatsapp: lead.whatsapp ?? null,
-        website: lead.website ?? null,
-        rating: lead.rating ?? null,
-        reviewCount: lead.reviewCount ?? null,
-        photos: (lead.photos as string[]) ?? [],
-        logoUrl: lead.logoUrl ?? null,
-        instagram: lead.instagram ?? null,
-        facebook: lead.facebook ?? null,
-        googleMapsUrl: lead.googleMapsUrl,
-        scrapedAt: lead.scrapedAt,
-      };
-
-      const validation = await websiteValidator.validate(businessRaw);
-
-      if (validation.hasOwnWebsite) {
-        log.info({ name: lead.name, url: validation.websiteUrl }, "Lead descartado: possui site próprio");
-        await leadRepository.updateValidation(leadId, { ...businessRaw, validation });
-        return { status: "disqualified", reason: validation.reason };
+      const validationResult = await stageValidate(lead);
+      if (!validationResult.ok) {
+        log.info({ name: lead.name, reason: validationResult.reason }, "Lead descartado");
+        return { status: "disqualified", reason: validationResult.reason };
       }
 
-      const businessValidated: BusinessValidated = { ...businessRaw, validation };
-      await leadRepository.updateValidation(leadId, businessValidated);
-
-      // ── Etapa 2: Classificação de nicho + scoring ──────────────────────
+      // ── Stage 2: Classify + Score ────────────────────────────────────────
       await job.updateProgress(30);
-      log.debug({ name: lead.name }, "Etapa 2: Classificando nicho");
+      log.debug({ name: lead.name }, "Stage 2/4 — classificação e score");
 
-      const nicheResult = await nicheClassifier.classify(lead.name, lead.category);
-      const businessEnriched = scoringEngine.score(businessValidated, nicheResult.niche, nicheResult.confidence);
-      await leadRepository.updateEnrichment(leadId, businessEnriched);
-
-      // Mínimo de score para continuar
-      if (businessEnriched.score < 20) {
-        log.info({ name: lead.name, score: businessEnriched.score }, "Lead com score baixo, pulando");
-        await leadRepository.updateStatus(leadId, "disqualified");
-        return { status: "low_score", score: businessEnriched.score };
+      const enrichResult = await stageEnrich(leadId, validationResult.business);
+      if (!enrichResult.ok) {
+        log.info({ name: lead.name, reason: enrichResult.reason }, "Lead descartado");
+        return { status: "disqualified", reason: enrichResult.reason };
       }
 
-      // Verifica se tem telefone para enviar
-      const targetPhone = lead.whatsapp ?? lead.phone;
-      if (!targetPhone) {
-        log.info({ name: lead.name }, "Lead sem telefone, pulando");
-        await leadRepository.updateStatus(leadId, "disqualified");
-        return { status: "no_phone" };
-      }
+      const { enriched } = enrichResult;
 
-      // ── Etapa 3: Personalização de conteúdo ─────────────────────────────
-      await job.updateProgress(50);
-      log.debug({ name: lead.name }, "Etapa 3: Personalizando conteúdo");
+      // ── Stage 3: Render + Screenshot ─────────────────────────────────────
+      await job.updateProgress(55);
+      log.debug({ name: lead.name }, "Stage 3/4 — renderização e screenshot");
 
-      const templateData = await contentPersonalizer.personalize(businessEnriched);
+      const mockupPath = await stageRenderAndCapture(leadId, enriched);
 
-      // ── Etapa 4: Renderização do template ───────────────────────────────
-      await job.updateProgress(65);
-      log.debug({ name: lead.name }, "Etapa 4: Renderizando template");
+      // ── Stage 4: Generate message + enqueue dispatch ─────────────────────
+      await job.updateProgress(85);
+      log.debug({ name: lead.name }, "Stage 4/4 — mensagem e agendamento de disparo");
 
-      const renderedPage = await templateEngine.render(templateData);
-      await leadRepository.updatePagePath(leadId, renderedPage.filePath);
-
-      // ── Etapa 5: Screenshot ──────────────────────────────────────────────
-      await job.updateProgress(80);
-      log.debug({ name: lead.name }, "Etapa 5: Capturando screenshot");
-
-      const screenshot = await screenshotGenerator.capture(renderedPage.filePath, lead.name);
-      const mockupPath = await mockupComposer.compose(screenshot.filePath, lead.name, "browser");
-
-      await leadRepository.updateScreenshotPath(leadId, mockupPath);
-
-      // ── Etapa 6: Gera mensagem e enfileira disparo ───────────────────────
-      await job.updateProgress(90);
-      log.debug({ name: lead.name }, "Etapa 6: Gerando mensagem e enfileirando disparo");
-
-      const message = await messageGenerator.generate(businessEnriched);
+      const message = await messageGenerator.generate(enriched);
+      const targetPhone = (enriched.whatsapp ?? enriched.phone)!;
 
       const dispatchJob: DispatchJobData = {
         leadId,
@@ -119,17 +141,13 @@ export function createPipelineWorker(): Worker {
       };
 
       await dispatchQueue.add(`dispatch-${leadId}`, dispatchJob, {
-        delay: Math.floor(Math.random() * 300_000) + 60_000, // Delay aleatório 1-6 min
+        delay: Math.floor(Math.random() * 300_000) + 60_000, // 1–6 min random delay
       });
 
       await job.updateProgress(100);
-      log.info({ name: lead.name, niche: businessEnriched.niche, score: businessEnriched.score }, "Pipeline concluído");
+      log.info({ name: lead.name, niche: enriched.niche, score: enriched.score }, "Pipeline concluído");
 
-      return {
-        status: "pipeline_complete",
-        niche: businessEnriched.niche,
-        score: businessEnriched.score,
-      };
+      return { status: "pipeline_complete", niche: enriched.niche, score: enriched.score };
     },
     {
       connection: redisConnection,

@@ -1,7 +1,8 @@
-import { eq, and, isNull, desc, sql } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "../client.js";
 import { leads, type Lead, type NewLead } from "../schema.js";
+import { BusinessRawSchema } from "../../validation/business.schema.js";
 import type { BusinessRaw, BusinessValidated, BusinessEnriched, LeadStatus } from "../../types/business.types.js";
 
 export class LeadRepository {
@@ -10,41 +11,61 @@ export class LeadRepository {
     return rows[0] ?? null;
   }
 
-  async existsByPlaceId(placeId: string): Promise<boolean> {
-    const result = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(leads)
-      .where(eq(leads.placeId, placeId));
-    return (result[0]?.count ?? 0) > 0;
+  async findById(id: string): Promise<Lead | null> {
+    const rows = await db.select().from(leads).where(eq(leads.id, id)).limit(1);
+    return rows[0] ?? null;
   }
 
-  async createFromRaw(business: BusinessRaw): Promise<Lead> {
+  async existsByPlaceId(placeId: string): Promise<boolean> {
+    const result = await db
+      .select({ one: sql<number>`1` })
+      .from(leads)
+      .where(eq(leads.placeId, placeId))
+      .limit(1);
+    return result.length > 0;
+  }
+
+  /**
+   * Validates and inserts a new lead.
+   * Uses ON CONFLICT DO NOTHING to prevent TOCTOU race conditions
+   * when multiple scrape jobs process the same location simultaneously.
+   * Returns `created: false` when the lead already existed.
+   */
+  async upsertFromRaw(business: BusinessRaw): Promise<{ lead: Lead; created: boolean }> {
+    const validated = BusinessRawSchema.parse(business);
+
     const newLead: NewLead = {
       id: randomUUID(),
-      placeId: business.placeId,
-      name: business.name,
-      category: business.category,
-      address: business.address,
-      city: business.city,
-      phone: business.phone,
-      whatsapp: business.whatsapp,
-      website: business.website,
-      rating: business.rating,
-      reviewCount: business.reviewCount,
-      photos: business.photos,
-      logoUrl: business.logoUrl,
-      instagram: business.instagram,
-      facebook: business.facebook,
-      googleMapsUrl: business.googleMapsUrl,
+      placeId: validated.placeId,
+      name: validated.name,
+      category: validated.category,
+      address: validated.address,
+      city: validated.city,
+      phone: validated.phone,
+      whatsapp: validated.whatsapp,
+      website: validated.website,
+      rating: validated.rating,
+      reviewCount: validated.reviewCount,
+      photos: validated.photos,
+      logoUrl: validated.logoUrl,
+      instagram: validated.instagram,
+      facebook: validated.facebook,
+      googleMapsUrl: validated.googleMapsUrl,
       status: "scraped",
-      scrapedAt: business.scrapedAt,
+      scrapedAt: validated.scrapedAt,
       updatedAt: new Date(),
     };
 
-    const rows = await db.insert(leads).values(newLead).returning();
-    const row = rows[0];
-    if (!row) throw new Error("Falha ao inserir lead");
-    return row;
+    const rows = await db.insert(leads).values(newLead).onConflictDoNothing().returning();
+
+    if (rows[0]) {
+      return { lead: rows[0], created: true };
+    }
+
+    // Conflict: lead with this placeId already exists
+    const existing = await this.findByPlaceId(validated.placeId);
+    if (!existing) throw new Error(`Conflito no insert mas lead não encontrado: ${validated.placeId}`);
+    return { lead: existing, created: false };
   }
 
   async updateValidation(id: string, validated: BusinessValidated): Promise<void> {
@@ -108,39 +129,22 @@ export class LeadRepository {
     return db
       .select()
       .from(leads)
-      .where(
-        and(
-          eq(leads.status, "screenshot_ready"),
-          isNull(leads.dispatchedAt)
-        )
-      )
+      .where(eq(leads.status, "screenshot_ready"))
       .orderBy(desc(leads.score))
       .limit(limit);
   }
 
   async getValidatedNotScored(limit = 20): Promise<Lead[]> {
-    return db
-      .select()
-      .from(leads)
-      .where(eq(leads.status, "validated"))
-      .limit(limit);
+    return db.select().from(leads).where(eq(leads.status, "validated")).limit(limit);
   }
 
   async countByStatus(): Promise<Record<string, number>> {
     const rows = await db
-      .select({
-        status: leads.status,
-        count: sql<number>`count(*)`,
-      })
+      .select({ status: leads.status, count: sql<number>`count(*)` })
       .from(leads)
       .groupBy(leads.status);
 
     return Object.fromEntries(rows.map((r) => [r.status, Number(r.count)]));
-  }
-
-  async findById(id: string): Promise<Lead | null> {
-    const rows = await db.select().from(leads).where(eq(leads.id, id)).limit(1);
-    return rows[0] ?? null;
   }
 }
 

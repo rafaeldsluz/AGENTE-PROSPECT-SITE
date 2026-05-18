@@ -28,7 +28,7 @@ export class Orchestrator {
     log.info("Iniciando Sistema de Prospecção Automatizada");
 
     await this.checkInfrastructure();
-    this.dashboardServer = createDashboardServer(3000);
+    this.dashboardServer = createDashboardServer(config.app.dashboardPort);
     await this.startWorkers();
     await this.scheduleScraping();
     await this.printStats();

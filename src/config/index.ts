@@ -19,6 +19,9 @@ const schema = z.object({
   OUTPUT_DIR: z.string().default("./output"),
   SCREENSHOTS_DIR: z.string().default("./output/screenshots"),
   PAGES_DIR: z.string().default("./output/pages"),
+  DASHBOARD_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  DASHBOARD_USER: z.string().min(1).default("admin"),
+  DASHBOARD_PASSWORD: z.string().optional(),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
 });
@@ -69,5 +72,8 @@ export const config = {
     env: env.NODE_ENV,
     logLevel: env.LOG_LEVEL,
     isDev: env.NODE_ENV === "development",
+    dashboardPort: env.DASHBOARD_PORT,
+    dashboardUser: env.DASHBOARD_USER,
+    dashboardPassword: env.DASHBOARD_PASSWORD,
   },
 } as const;
