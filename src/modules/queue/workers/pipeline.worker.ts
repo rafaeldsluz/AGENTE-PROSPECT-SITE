@@ -10,6 +10,7 @@ import { messageGenerator } from "../../ai/message-generator.js";
 import { templateEngine } from "../../renderer/template-engine.js";
 import { screenshotGenerator } from "../../screenshot/screenshot-generator.js";
 import { mockupComposer } from "../../screenshot/mockup-composer.js";
+import { config } from "../../../config/index.js";
 import type { PipelineJobData, DispatchJobData } from "../../../types/queue.types.js";
 import type { BusinessRaw, BusinessValidated, BusinessEnriched } from "../../../types/business.types.js";
 import type { Lead } from "../../../database/schema.js";
@@ -59,9 +60,9 @@ async function stageEnrich(
   const enriched = scoringEngine.score(business, nicheResult.niche, nicheResult.confidence);
   await leadRepository.updateEnrichment(leadId, enriched);
 
-  if (enriched.score < 20) {
+  if (enriched.score < config.scraping.minScore) {
     await leadRepository.updateStatus(leadId, "disqualified");
-    return { ok: false, reason: `score insuficiente: ${enriched.score}` };
+    return { ok: false, reason: `score insuficiente: ${enriched.score} (mínimo: ${config.scraping.minScore})` };
   }
 
   const targetPhone = enriched.whatsapp ?? enriched.phone;

@@ -7,6 +7,7 @@ export type Niche =
   | "estetica"
   | "loja"
   | "servicos"
+  | "advogado"
   | "outros";
 
 export type LeadStatus =
@@ -58,6 +59,7 @@ export interface ScoreBreakdown {
   hasInstagram: number;
   hasLogo: number;
   categoryRelevance: number;
+  instagramOnly: number;
 }
 
 export interface BusinessEnriched extends BusinessValidated {

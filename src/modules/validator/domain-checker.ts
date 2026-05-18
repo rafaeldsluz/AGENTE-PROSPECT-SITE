@@ -82,6 +82,33 @@ export async function isUrlAccessible(url: string): Promise<boolean> {
   }
 }
 
+// Padrões em HTML que indicam domínio estacionado ou à venda
+const PARKING_SIGNATURES = [
+  "domain for sale", "buy this domain", "domain parking", "parked by",
+  "this domain is parked", "godaddy.com/parking", "sedoparking",
+  "hugedomains.com", "dan.com", "afternic.com", "domainmarket.com",
+  "register4less", "domínio à venda", "este domínio está à venda",
+  "parking page", "this web page is parked",
+] as const;
+
+export async function isParkedPage(url: string): Promise<boolean> {
+  try {
+    const fullUrl = url.startsWith("http") ? url : `https://${url}`;
+    const response = await axios.get<string>(fullUrl, {
+      timeout: 8_000,
+      maxRedirects: 5,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ProspectorBot/1.0)" },
+      validateStatus: (s) => s === 200,
+      responseType: "text",
+    });
+    // Lê só os primeiros 4 KB — suficiente para detectar páginas de parking
+    const snippet = (response.data ?? "").slice(0, 4_096).toLowerCase();
+    return PARKING_SIGNATURES.some((sig) => snippet.includes(sig));
+  } catch {
+    return false;
+  }
+}
+
 export function generateDomainCandidates(companyName: string): string[] {
   const base = companyName
     .toLowerCase()

@@ -1,6 +1,8 @@
+import { createHash } from "crypto";
 import { deepseekChat } from "../../utils/deepseek-client.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import { withRetry } from "../../utils/retry.js";
+import { getCached, setCached, cacheTTL } from "../../utils/ai-cache.js";
 import type { BusinessEnriched } from "../../types/business.types.js";
 import type { TemplateData } from "../../types/template.types.js";
 import { formatBrazilianPhone } from "../../utils/phone.js";
@@ -74,6 +76,17 @@ const NICHE_DEFAULTS: Record<string, Partial<TemplateData>> = {
     ],
     differentials: ["Produtos premium", "Profissionais especializados", "Ambiente relaxante", "Agendamento online"],
   },
+  advogado: {
+    primaryColor: "#0a0e1a",
+    accentColor: "#c9a84c",
+    services: [
+      { icon: "⚖️", name: "Direito Trabalhista", description: "Defesa de direitos em causas trabalhistas" },
+      { icon: "🏛️", name: "Direito Civil", description: "Contratos, família e sucessões" },
+      { icon: "🔒", name: "Direito Criminal", description: "Defesa técnica em processo penal" },
+      { icon: "🏢", name: "Direito Empresarial", description: "Assessoria para empresas e contratos" },
+    ],
+    differentials: ["OAB regularizado", "Atendimento confidencial", "Experiência comprovada", "Consulta inicial gratuita"],
+  },
 };
 
 export class ContentPersonalizer {
@@ -82,11 +95,26 @@ export class ContentPersonalizer {
 
     const defaults = NICHE_DEFAULTS[business.niche] ?? NICHE_DEFAULTS["oficina"] ?? {};
 
+    // Consulta cache antes de chamar DeepSeek
+    const cacheKey = `content:${createHash("md5").update(`${business.name}|${business.niche}|${business.city}`).digest("hex")}`;
+
+    type AiContent = { heroHeadline: string; heroSubtitle: string; ctaText: string };
+    let aiContent: AiContent | null = await getCached<AiContent>(cacheKey);
+
+    if (!aiContent) {
+      try {
+        aiContent = await withRetry(
+          () => this.generateAIContent(business),
+          { maxAttempts: 3, baseDelayMs: 2_000, maxDelayMs: 8_000 }
+        );
+        await setCached(cacheKey, aiContent, cacheTTL.CONTENT);
+      } catch (err) {
+        log.warn({ name: business.name, error: String(err) }, "IA falhou, usando defaults");
+        return this.buildWithDefaults(business, defaults);
+      }
+    }
+
     try {
-      const aiContent = await withRetry(
-        () => this.generateAIContent(business),
-        { maxAttempts: 3, baseDelayMs: 2_000, maxDelayMs: 8_000 }
-      );
 
       const phone = business.whatsapp ?? business.phone ?? "";
       const formatted = formatBrazilianPhone(phone);
@@ -111,7 +139,7 @@ export class ContentPersonalizer {
         facebook: business.facebook,
       };
     } catch (err) {
-      log.warn({ name: business.name, error: String(err) }, "IA falhou, usando defaults");
+      log.warn({ name: business.name, error: String(err) }, "Montagem de template falhou, usando defaults");
       return this.buildWithDefaults(business, defaults);
     }
   }

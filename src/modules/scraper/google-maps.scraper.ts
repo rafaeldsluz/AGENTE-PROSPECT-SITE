@@ -18,15 +18,54 @@ interface ScraperOptions {
   headless?: boolean;
 }
 
+// Regra geral: só incluir queries de negócios que (a) frequentemente não têm site
+// e (b) teriam ganho real com presença digital profissional.
 const NICHE_QUERIES: Record<string, string[]> = {
-  oficina: ["oficina mecânica", "auto center", "mecânico de carros"],
-  clinica: ["clínica médica", "consultório médico", "clínica odontológica", "dentista"],
-  restaurante: ["restaurante", "lanchonete", "pizzaria", "hamburgueria"],
-  academia: ["academia de ginástica", "crossfit", "musculação"],
-  imoveis: ["imobiliária", "corretor de imóveis", "consultoria imobiliária"],
-  estetica: ["salão de beleza", "barbearia", "estética", "nail art"],
-  loja: ["loja de roupas", "loja de calçados", "pet shop"],
-  servicos: ["dedetizadora", "chaveiro", "encanador", "eletricista"],
+  // Mecânicos: geralmente sem site, dependem de indicação — site profissional é upgrade claro
+  oficina: [
+    "oficina mecânica", "auto center", "mecânico de carros",
+    "funilaria e pintura", "auto elétrica", "suspensão e freios",
+  ],
+  // Saúde: clínicas pequenas e consultórios solo raramente têm site profissional
+  clinica: [
+    "clínica médica", "consultório médico", "clínica odontológica", "dentista",
+    "clínica veterinária", "fisioterapia", "psicólogo",
+  ],
+  // Alimentação: restaurantes locais vivem de Instagram/WhatsApp — site aumenta discovery
+  restaurante: [
+    "restaurante", "lanchonete", "pizzaria", "hamburgueria",
+    "churrascaria", "café e bistrô", "marmitex delivery",
+  ],
+  // Fitness: studios boutique e academias independentes raramente têm site
+  academia: [
+    "academia de ginástica", "crossfit", "musculação",
+    "pilates studio", "studio de yoga", "estúdio fitness",
+  ],
+  // Imóveis: corretores independentes e pequenas imobiliárias com só Instagram
+  imoveis: [
+    "imobiliária", "corretor de imóveis", "consultoria imobiliária",
+    "lançamentos imobiliários",
+  ],
+  // Estética: salões e clínicas de beleza são dos que mais convertem — vivem do Instagram
+  estetica: [
+    "salão de beleza", "barbearia", "estética", "nail art",
+    "clínica estética", "micropigmentação", "depilação a laser",
+  ],
+  // Lojas físicas locais que dependem só de redes sociais para atrair clientes
+  loja: [
+    "loja de roupas", "loja de calçados", "pet shop",
+    "farmácia de manipulação", "ótica", "loja de móveis planejados",
+  ],
+  // Serviços técnicos que são contratados por busca no Google — site é essencial
+  servicos: [
+    "dedetizadora", "chaveiro", "encanador", "eletricista",
+    "empresa de limpeza", "marmoraria",
+  ],
+  // Advogados solos e pequenas bancas têm presença digital quase zero
+  advogado: [
+    "escritório de advocacia", "advogado trabalhista",
+    "advogado criminal", "consultório jurídico", "advogado imobiliário",
+  ],
 };
 
 export function getNicheQueries(niches: string[]): string[] {
@@ -272,7 +311,40 @@ export class GoogleMapsScraper {
         const placeIdMatch = canonicalUrl.match(/0x[0-9a-fA-F]+:0x[0-9a-fA-F]+/);
         const placeId = placeIdMatch?.[0] ?? canonicalUrl.match(/place\/([^/]+)/)?.[1] ?? "";
 
-        return { name, category, address, phone, website, ratingRaw, reviewRaw, placeId, canonicalUrl };
+        // Fotos — extrai URLs de imagens do CDN Google presentes no painel
+        // Filtra ícones pequenos (=s20, =s32 etc.) e avatares de usuário
+        const cdnImgs = Array.from(
+          main.querySelectorAll<HTMLImageElement>('img[src*="googleusercontent"], img[src*="ggpht"]')
+        )
+          .map((img) => img.src)
+          .filter((src) => {
+            if (!src) return false;
+            if (src.includes(".svg")) return false;
+            // Ícones pequenos têm padrão =s{1-2 dígitos} no fim ou antes de -
+            if (/=s[0-9]{1,2}($|[^0-9])/.test(src)) return false;
+            // Avatares de usuário (reviews) têm padrão -c0x ou -mo-br
+            if (src.includes("-c0x") || src.includes("-mo-br")) return false;
+            return true;
+          });
+        const photoUrls = [...new Set(cdnImgs)].slice(0, 10);
+
+        // Logo — primeira imagem de negócio disponível (capa do perfil)
+        const logoUrl = photoUrls[0] ?? null;
+
+        // Redes sociais declaradas no Google Business Profile
+        const allAnchors = Array.from(main.querySelectorAll<HTMLAnchorElement>("a[href]"));
+        const instagramAnchor = allAnchors.find((a) => a.href?.includes("instagram.com"));
+        const facebookAnchor = allAnchors.find(
+          (a) => a.href?.includes("facebook.com") && !a.href?.includes("google.com")
+        );
+        const instagram = instagramAnchor?.href?.split("?")[0]?.trim() ?? null;
+        const facebook = facebookAnchor?.href?.split("?")[0]?.trim() ?? null;
+
+        return {
+          name, category, address, phone, website,
+          ratingRaw, reviewRaw, placeId, canonicalUrl,
+          photoUrls, logoUrl, instagram, facebook,
+        };
       });
 
       if (!raw) return null;
@@ -293,10 +365,10 @@ export class GoogleMapsScraper {
         website: raw.website?.trim() ?? null,
         rating: rating !== null && !isNaN(rating) ? rating : null,
         reviewCount: reviewCount !== null && !isNaN(reviewCount) ? reviewCount : null,
-        photos: [],
-        logoUrl: null,
-        instagram: null,
-        facebook: null,
+        photos: raw.photoUrls,
+        logoUrl: raw.logoUrl,
+        instagram: raw.instagram,
+        facebook: raw.facebook,
         googleMapsUrl: raw.canonicalUrl,
         scrapedAt: new Date(),
       };

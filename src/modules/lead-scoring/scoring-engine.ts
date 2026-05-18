@@ -5,6 +5,7 @@ const log = createModuleLogger("lead-scoring");
 
 // Nichos com maior potencial de conversão (mais receptivos a presença digital)
 const NICHE_RELEVANCE: Record<Niche, number> = {
+  advogado: 10,  // >90% sem site profissional, alta capacidade de pagamento
   clinica: 10,
   estetica: 9,
   academia: 8,
@@ -41,14 +42,20 @@ export class ScoringEngine {
       hasInstagram: business.instagram ? 8 : 0,
       hasLogo: business.logoUrl ? 5 : 0,
       categoryRelevance: NICHE_RELEVANCE[niche] ?? 3,
+      // Bônus: empresa depende 100% de redes sociais — máxima necessidade de site
+      instagramOnly: this.scoreInstagramOnly(business),
     };
   }
 
   private computeTotal(breakdown: ScoreBreakdown, nicheConfidence: number): number {
     const rawTotal = Object.values(breakdown).reduce((sum, v) => sum + v, 0);
-    // Normaliza para 0-100 e aplica confiança do nicho
-    const normalized = Math.min(100, rawTotal * 1.5);
+    const normalized = Math.min(100, rawTotal * 1.4);
     return Math.round(normalized * nicheConfidence);
+  }
+
+  // Empresa com Instagram mas sem site = sinal forte de necessidade digital
+  private scoreInstagramOnly(business: BusinessValidated): number {
+    return business.instagram && !business.validation.hasOwnWebsite ? 10 : 0;
   }
 
   private scoreWhatsApp(business: BusinessValidated): number {

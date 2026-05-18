@@ -3,6 +3,7 @@ import {
   isSocialOrDirectoryDomain,
   isDomainActive,
   isUrlAccessible,
+  isParkedPage,
   generateDomainCandidates,
 } from "./domain-checker.js";
 import { createModuleLogger } from "../../utils/logger.js";
@@ -71,6 +72,12 @@ export class WebsiteValidator {
         if (active) {
           const accessible = await isUrlAccessible(candidate);
           if (accessible) {
+            // Verifica se é página estacionada (falso positivo crítico)
+            const parked = await isParkedPage(candidate);
+            if (parked) {
+              log.debug({ candidate }, "Domínio candidato está estacionado/à venda, ignorando");
+              continue;
+            }
             checks.push({
               source: "domain_candidate",
               result: true,

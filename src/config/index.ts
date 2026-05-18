@@ -16,6 +16,7 @@ const schema = z.object({
   WHATSAPP_MAX_DELAY_MS: z.coerce.number().default(600_000),
   WHATSAPP_MAX_PER_HOUR: z.coerce.number().default(8),
   SCRAPE_MAX_LEADS_PER_RUN: z.coerce.number().default(50),
+  LEAD_MIN_SCORE: z.coerce.number().int().min(0).max(100).default(35),
   OUTPUT_DIR: z.string().default("./output"),
   SCREENSHOTS_DIR: z.string().default("./output/screenshots"),
   PAGES_DIR: z.string().default("./output/pages"),
@@ -57,6 +58,7 @@ export const config = {
       ? env.TARGET_NICHES.split(",").map((n) => n.trim()).filter(Boolean)
       : [],
     maxLeadsPerRun: env.SCRAPE_MAX_LEADS_PER_RUN,
+    minScore: env.LEAD_MIN_SCORE,
   },
   whatsapp: {
     minDelayMs: env.WHATSAPP_MIN_DELAY_MS,

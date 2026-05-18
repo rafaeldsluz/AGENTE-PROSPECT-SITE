@@ -10,6 +10,7 @@ import { renderRestauranteTemplate } from "./templates/restaurante.template.js";
 import { renderAcademiaTemplate } from "./templates/academia.template.js";
 import { renderImoveisTemplate } from "./templates/imoveis.template.js";
 import { renderEsteticaTemplate } from "./templates/estetica.template.js";
+import { renderAdvogadoTemplate } from "./templates/advogado.template.js";
 
 const log = createModuleLogger("renderer");
 
@@ -22,9 +23,10 @@ const TEMPLATE_MAP: Record<Niche, TemplateRenderer> = {
   academia: renderAcademiaTemplate,
   imoveis: renderImoveisTemplate,
   estetica: renderEsteticaTemplate,
-  loja: renderOficinaTemplate,       // fallback para template genérico
-  servicos: renderOficinaTemplate,   // fallback para template genérico
-  outros: renderClinicaTemplate,     // fallback
+  advogado: renderAdvogadoTemplate,
+  loja: renderEsteticaTemplate,      // estética tem layout clean adequado para varejo
+  servicos: renderOficinaTemplate,   // serviços técnicos — layout industrial
+  outros: renderClinicaTemplate,     // fallback profissional neutro
 };
 
 function sanitizeFilename(name: string): string {

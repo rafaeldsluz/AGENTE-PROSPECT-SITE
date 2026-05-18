@@ -1,6 +1,8 @@
+import { createHash } from "crypto";
 import { deepseekChat } from "../../utils/deepseek-client.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import { withRetry } from "../../utils/retry.js";
+import { getCached, setCached, cacheTTL } from "../../utils/ai-cache.js";
 import type { Niche } from "../../types/business.types.js";
 
 const log = createModuleLogger("ai:niche-classifier");
@@ -13,23 +15,31 @@ interface ClassificationResult {
 
 const VALID_NICHES: Niche[] = [
   "oficina", "clinica", "restaurante", "academia",
-  "imoveis", "estetica", "loja", "servicos", "outros",
+  "imoveis", "estetica", "loja", "servicos", "advogado", "outros",
 ];
 
 export class NicheClassifier {
   async classify(companyName: string, category: string): Promise<ClassificationResult> {
-    // Classificação rápida por palavras-chave antes de chamar a IA
+    // Classificação rápida por palavras-chave — zero custo de tokens
     const keywordResult = this.classifyByKeywords(category, companyName);
     if (keywordResult.confidence >= 0.85) {
       log.debug({ name: companyName, niche: keywordResult.niche }, "Nicho classificado por keywords");
       return keywordResult;
     }
 
-    // Chama Claude para classificação mais precisa
-    return withRetry(
+    // Consulta cache Redis antes de chamar a IA
+    const cacheKey = `niche:${createHash("md5").update(`${companyName}|${category}`).digest("hex")}`;
+    const cached = await getCached<ClassificationResult>(cacheKey);
+    if (cached) return cached;
+
+    // Chama DeepSeek para classificação de casos ambíguos
+    const result = await withRetry(
       () => this.classifyWithAI(companyName, category),
       { maxAttempts: 3, baseDelayMs: 2_000, maxDelayMs: 10_000 }
     );
+
+    await setCached(cacheKey, result, cacheTTL.NICHE);
+    return result;
   }
 
   private classifyByKeywords(category: string, name: string): ClassificationResult {
@@ -75,6 +85,11 @@ export class NicheClassifier {
         niche: "servicos",
         keywords: ["dedetizadora", "chaveiro", "encanador", "eletricista", "pintora", "reforma", "construção"],
         confidence: 0.85,
+      },
+      {
+        niche: "advogado",
+        keywords: ["advocacia", "advogado", "escritório jurídico", "jurídico", "direito", "oab", "defesa criminal", "trabalhista"],
+        confidence: 0.92,
       },
     ];
 
