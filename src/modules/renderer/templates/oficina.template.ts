@@ -24,7 +24,7 @@ export function renderOficinaTemplate(data: TemplateData): string {
     )
     .join("");
 
-  const whatsappUrl = `https://wa.me/55${data.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vi o site da ${data.companyName} e gostaria de mais informações.`)}`;
+  const whatsappUrl = `https://wa.me/55${data.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsappMessage)}`;
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">

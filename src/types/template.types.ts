@@ -23,6 +23,7 @@ export interface TemplateData {
   heroHeadline: string;
   heroSubtitle: string;
   ctaText: string;
+  whatsappMessage: string;
   services: ServiceItem[];
   differentials: string[];
   testimonials: Testimonial[];

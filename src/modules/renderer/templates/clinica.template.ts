@@ -1,7 +1,7 @@
 import type { TemplateData } from "../../../types/template.types.js";
 
 export function renderClinicaTemplate(data: TemplateData): string {
-  const whatsappUrl = `https://wa.me/55${data.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Gostaria de agendar uma consulta na ${data.companyName}.`)}`;
+  const whatsappUrl = `https://wa.me/55${data.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsappMessage)}`;
 
   const services = data.services
     .map(

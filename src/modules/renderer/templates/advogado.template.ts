@@ -24,7 +24,7 @@ export function renderAdvogadoTemplate(data: TemplateData): string {
     )
     .join("");
 
-  const whatsappUrl = `https://wa.me/55${data.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Olá, gostaria de agendar uma consulta com ${data.companyName}.`)}`;
+  const whatsappUrl = `https://wa.me/55${data.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsappMessage)}`;
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">

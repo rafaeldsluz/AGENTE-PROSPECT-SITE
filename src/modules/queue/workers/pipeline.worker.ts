@@ -7,9 +7,8 @@ import { nicheClassifier } from "../../ai/niche-classifier.js";
 import { scoringEngine } from "../../lead-scoring/scoring-engine.js";
 import { contentPersonalizer } from "../../ai/content-personalizer.js";
 import { messageGenerator } from "../../ai/message-generator.js";
-import { templateEngine } from "../../renderer/template-engine.js";
+import { renderScopePage } from "../../renderer/scope-renderer.js";
 import { screenshotGenerator } from "../../screenshot/screenshot-generator.js";
-import { mockupComposer } from "../../screenshot/mockup-composer.js";
 import { config } from "../../../config/index.js";
 import { isWithinDispatchWindow } from "../../dispatch-schedule.js";
 import type { PipelineJobData, DispatchJobData } from "../../../types/queue.types.js";
@@ -77,14 +76,13 @@ async function stageEnrich(
 
 async function stageRenderAndCapture(leadId: string, enriched: BusinessEnriched): Promise<string> {
   const templateData = await contentPersonalizer.personalize(enriched);
-  const renderedPage = await templateEngine.render(templateData);
-  await leadRepository.updatePagePath(leadId, renderedPage.filePath);
+  const scopeFilePath = await renderScopePage(templateData);
+  await leadRepository.updatePagePath(leadId, scopeFilePath);
 
-  const screenshot = await screenshotGenerator.capture(renderedPage.filePath, enriched.name);
-  const mockupPath = await mockupComposer.compose(screenshot.filePath, enriched.name, "browser");
-  await leadRepository.updateScreenshotPath(leadId, mockupPath);
+  const screenshot = await screenshotGenerator.capture(scopeFilePath, enriched.name);
+  await leadRepository.updateScreenshotPath(leadId, screenshot.filePath);
 
-  return mockupPath;
+  return screenshot.filePath;
 }
 
 // ── Worker ───────────────────────────────────────────────────────────────────
