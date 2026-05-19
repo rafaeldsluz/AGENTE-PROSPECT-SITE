@@ -21,14 +21,7 @@ interface ScraperOptions {
 // Regra geral: só incluir queries de negócios que (a) frequentemente não têm site
 // e (b) teriam ganho real com presença digital profissional.
 const NICHE_QUERIES: Record<string, string[]> = {
-  // Serviços automotivos especializados — cliente busca ativamente, não só por indicação
-  oficina: [
-    "auto center",
-    "funilaria e pintura",
-    "auto elétrica",
-    "suspensão e freios",
-  ],
-  // Saúde: clínicas e consultórios solo raramente têm site profissional
+  // Clínicas: busca ativa de alta intenção — "dentista perto de mim", agendamento online
   clinica: [
     "clínica odontológica",
     "dentista",
@@ -37,42 +30,20 @@ const NICHE_QUERIES: Record<string, string[]> = {
     "psicólogo",
     "clínica médica",
   ],
-  // Alimentação: pizzarias e hamburguerias convertem bem — cliente busca por tipo de comida
-  restaurante: [
-    "pizzaria",
-    "hamburgueria",
-    "churrascaria",
-    "restaurante",
-  ],
-  // Fitness: studios boutique e academias independentes raramente têm site
-  academia: [
-    "academia de ginástica",
-    "crossfit",
-    "pilates studio",
-    "studio de yoga",
-  ],
-  // Imóveis: corretores independentes com só Instagram perdem leads do Google
+  // Imóveis: corretor independente perde lead sem site — comprador pesquisa no Google
   imoveis: [
     "imobiliária",
     "corretor de imóveis",
     "consultoria imobiliária",
   ],
-  // Estética: maior taxa de conversão — vivem do Instagram, site profissional é diferencial
-  estetica: [
-    "salão de beleza",
-    "barbearia",
-    "clínica estética",
-    "micropigmentação",
-    "depilação a laser",
-  ],
-  // Serviços de alta intenção de busca — contratados diretamente pelo Google
+  // Serviços: ninguém tem o contato salvo — procura no Google na hora da necessidade
   servicos: [
     "dedetizadora",
     "empresa de limpeza",
     "marmoraria",
     "chaveiro",
   ],
-  // Advogados solos e pequenas bancas têm presença digital quase zero
+  // Advogados: credibilidade exige site, busca ativa por especialidade
   advogado: [
     "escritório de advocacia",
     "advogado trabalhista",

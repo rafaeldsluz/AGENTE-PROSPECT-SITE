@@ -9,26 +9,16 @@ import type { ServiceItem } from "../../types/template.types.js";
 const log = createModuleLogger("ai:landing-scope-agent");
 
 const NICHE_LABELS: Record<string, string> = {
-  oficina: "Oficina Mecânica / Auto Center",
   clinica: "Clínica / Consultório de Saúde",
-  restaurante: "Restaurante / Alimentação",
-  academia: "Academia / Centro de Fitness",
   imoveis: "Imobiliária / Corretagem de Imóveis",
-  estetica: "Salão de Beleza / Estética",
-  loja: "Loja / Varejo",
   servicos: "Prestação de Serviços",
   advogado: "Escritório de Advocacia",
   outros: "Empresa Local",
 };
 
 const NICHE_TONE: Record<string, string> = {
-  oficina: "técnico e confiante, foco em segurança e economia",
   clinica: "acolhedor e profissional, foco em cuidado e bem-estar",
-  restaurante: "apetitoso e convidativo, foco em sabor e experiência",
-  academia: "motivador e energético, foco em transformação e resultado",
   imoveis: "seguro e aspiracional, foco em realização e patrimônio",
-  estetica: "sofisticado e confiante, foco em beleza e autoestima",
-  loja: "amigável e prático, foco em variedade e qualidade",
   servicos: "competente e ágil, foco em solução e praticidade",
   advogado: "sério e confiável, foco em defesa e tranquilidade",
   outros: "profissional e próximo, foco em atendimento e resultado",

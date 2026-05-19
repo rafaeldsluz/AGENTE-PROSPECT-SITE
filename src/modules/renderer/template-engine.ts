@@ -4,29 +4,21 @@ import { config } from "../../config/index.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import type { TemplateData, RenderedPage } from "../../types/template.types.js";
 import type { Niche } from "../../types/business.types.js";
-import { renderOficinaTemplate } from "./templates/oficina.template.js";
 import { renderClinicaTemplate } from "./templates/clinica.template.js";
-import { renderRestauranteTemplate } from "./templates/restaurante.template.js";
-import { renderAcademiaTemplate } from "./templates/academia.template.js";
 import { renderImoveisTemplate } from "./templates/imoveis.template.js";
-import { renderEsteticaTemplate } from "./templates/estetica.template.js";
 import { renderAdvogadoTemplate } from "./templates/advogado.template.js";
+import { renderOficinaTemplate } from "./templates/oficina.template.js";
 
 const log = createModuleLogger("renderer");
 
 type TemplateRenderer = (data: TemplateData) => string;
 
 const TEMPLATE_MAP: Record<Niche, TemplateRenderer> = {
-  oficina: renderOficinaTemplate,
   clinica: renderClinicaTemplate,
-  restaurante: renderRestauranteTemplate,
-  academia: renderAcademiaTemplate,
   imoveis: renderImoveisTemplate,
-  estetica: renderEsteticaTemplate,
   advogado: renderAdvogadoTemplate,
-  loja: renderEsteticaTemplate,      // estética tem layout clean adequado para varejo
-  servicos: renderOficinaTemplate,   // serviços técnicos — layout industrial
-  outros: renderClinicaTemplate,     // fallback profissional neutro
+  servicos: renderOficinaTemplate,  // layout técnico/profissional
+  outros: renderClinicaTemplate,    // fallback neutro
 };
 
 function sanitizeFilename(name: string): string {

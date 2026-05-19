@@ -1,11 +1,6 @@
 export type Niche =
-  | "oficina"
   | "clinica"
-  | "restaurante"
-  | "academia"
   | "imoveis"
-  | "estetica"
-  | "loja"
   | "servicos"
   | "advogado"
   | "outros";
