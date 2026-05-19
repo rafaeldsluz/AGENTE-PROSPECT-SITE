@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance } from "axios";
+import https from "https";
 import { promises as fs } from "fs";
 import { config } from "../../config/index.js";
 import { createModuleLogger } from "../../utils/logger.js";
@@ -38,6 +39,8 @@ export class EvolutionApiClient {
         "Content-Type": "application/json",
       },
       timeout: 30_000,
+      // Certificado autoassinado no nip.io local — rejeição causava falha silenciosa
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
     });
   }
 
