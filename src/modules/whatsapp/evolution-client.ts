@@ -94,7 +94,7 @@ export class EvolutionApiClient {
         const payload: SendMediaPayload = {
           number,
           mediatype: "image",
-          mimetype: "image/png",
+          mimetype: "image/jpeg",
           media: base64Image,
           caption: caption ?? "",
         };

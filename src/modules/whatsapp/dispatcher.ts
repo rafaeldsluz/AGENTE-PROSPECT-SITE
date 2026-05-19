@@ -1,6 +1,6 @@
 import { config } from "../../config/index.js";
 import { createModuleLogger } from "../../utils/logger.js";
-import { randomDelay, sleep } from "../../utils/delay.js";
+import { randomDelay } from "../../utils/delay.js";
 import { evolutionClient } from "./evolution-client.js";
 import { dispatchRepository } from "../../database/repositories/dispatch.repository.js";
 import { leadRepository } from "../../database/repositories/lead.repository.js";
@@ -96,12 +96,6 @@ export class WhatsAppDispatcher {
     }
   }
 
-  async waitForNextSlot(): Promise<void> {
-    const { minDelayMs, maxDelayMs } = config.whatsapp;
-    const delay = Math.floor(Math.random() * (maxDelayMs - minDelayMs)) + minDelayMs;
-    log.info({ delaySeconds: Math.round(delay / 1000) }, "Aguardando antes do próximo disparo");
-    await sleep(delay);
-  }
 }
 
 export const whatsappDispatcher = new WhatsAppDispatcher();

@@ -3,7 +3,6 @@ import { redisConnection, pipelineQueue } from "../queue-manager.js";
 import { createModuleLogger } from "../../../utils/logger.js";
 import { GoogleMapsScraper } from "../../scraper/google-maps.scraper.js";
 import { leadRepository } from "../../../database/repositories/lead.repository.js";
-import { betweenPagesDelay } from "../../../utils/delay.js";
 import type { ScrapeJobData } from "../../../types/queue.types.js";
 import type { BusinessRaw } from "../../../types/business.types.js";
 
@@ -48,45 +47,41 @@ export function createScrapeWorker(): Worker {
       const s = await getOrInitScraper();
       await job.updateProgress(10);
 
-      let businesses;
-      try {
-        businesses = await s.scrapeQuery(searchQuery, { city, maxResults, headless: true });
-      } catch (err) {
-        // Browser may have crashed — reset so next job gets a fresh instance
-        await resetScraper();
-        throw err;
-      }
-
-      await job.updateProgress(60);
-      log.info({ count: businesses.length, query: searchQuery }, "Businesses encontrados");
-
-      for (const business of businesses) {
-        // Pre-filter determinístico: sem contato = pipeline vai descartar de qualquer forma
+      const onBusiness = async (business: BusinessRaw) => {
         if (!isContactable(business)) {
           log.debug({ name: business.name }, "Pre-filter: sem telefone/whatsapp, ignorando");
           skippedDuplicates++;
-          continue;
+          return;
         }
 
-        // upsertFromRaw validates input data and uses ON CONFLICT DO NOTHING,
-        // eliminating the TOCTOU race between the old existsByPlaceId + createFromRaw pattern.
         const { lead, created } = await leadRepository.upsertFromRaw(business);
-
         if (!created) {
           skippedDuplicates++;
-          continue;
+          return;
         }
 
         newLeads++;
+        log.info({ name: lead.name, city: lead.city }, "Lead salvo");
 
         await pipelineQueue.add(`pipeline-${lead.id}`, {
           leadId: lead.id,
           placeId: lead.placeId,
           sourceNiche: niche,
         });
+      };
 
-        await betweenPagesDelay();
+      try {
+        const businesses = await s.scrapeQuery(searchQuery, { city, maxResults, headless: true }, onBusiness);
+        log.info({ count: businesses.length, query: searchQuery }, "Businesses encontrados");
+      } catch (err) {
+        await resetScraper();
+        throw err;
       }
+
+      // Reseta contexto entre jobs: novos cookies + novo user-agent evitam detecção pelo Google
+      await s.resetContext().catch((err) =>
+        log.warn({ error: String(err) }, "Erro ao resetar contexto do browser")
+      );
 
       await job.updateProgress(100);
       log.info({ newLeads, skippedDuplicates, query: searchQuery }, "Scrape job concluído");

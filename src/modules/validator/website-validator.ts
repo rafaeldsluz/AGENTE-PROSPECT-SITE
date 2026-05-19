@@ -43,24 +43,7 @@ export class WebsiteValidator {
       }
     }
 
-    // ── Check 2: Instagram bio link ──────────────────────────────────────
-    if (business.instagram) {
-      const bioLink = await this.extractInstagramBioLink(business.instagram);
-      if (bioLink) {
-        const domain = extractDomain(bioLink);
-        if (!isSocialOrDirectoryDomain(domain)) {
-          const active = await isUrlAccessible(bioLink);
-          checks.push({
-            source: "instagram_bio",
-            result: active,
-            detail: `Link na bio do Instagram: ${bioLink}`,
-            weight: 0.85,
-          });
-        }
-      }
-    }
-
-    // ── Check 3: Domínios .com.br baseados no nome da empresa ────────────
+    // ── Check 2: Domínios .com.br baseados no nome da empresa ────────────
     // Só verifica TLD brasileiro para evitar falsos positivos em domínios
     // .com genéricos que pertencem a empresas diferentes em outros países
     if (!checks.some((c) => c.result)) {
@@ -126,36 +109,6 @@ export class WebsiteValidator {
     return domainMatch ? `https://${domainMatch[0]}` : null;
   }
 
-  private async extractInstagramBioLink(instagramUrl: string): Promise<string | null> {
-    try {
-      const usernameMatch = instagramUrl.match(/instagram\.com\/([^/?]+)/);
-      if (!usernameMatch) return null;
-      const username = usernameMatch[1];
-      if (!username) return null;
-
-      const response = await import("axios").then((m) =>
-        m.default.get(
-          `https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
-          {
-            timeout: 8_000,
-            headers: {
-              "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X)",
-              "Accept": "application/json",
-              "x-ig-app-id": "936619743392459",
-            },
-            validateStatus: (s: number) => s < 500,
-          }
-        )
-      );
-
-      if (response.status === 200 && response.data?.data?.user?.external_url) {
-        return response.data.data.user.external_url as string;
-      }
-    } catch {
-      // Instagram protege contra scraping
-    }
-    return null;
-  }
 }
 
 export const websiteValidator = new WebsiteValidator();

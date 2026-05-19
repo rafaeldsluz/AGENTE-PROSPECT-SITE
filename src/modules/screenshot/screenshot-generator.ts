@@ -45,24 +45,23 @@ export class ScreenshotGenerator {
 
       // Carrega o HTML local
       const fileUrl = `file:///${htmlFilePath.replace(/\\/g, "/")}`;
-      await page.goto(fileUrl, { waitUntil: "networkidle", timeout: 30_000 });
+      await page.goto(fileUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
 
-      // Aguarda fontes e imagens carregarem
-      await sleep(2_000);
-
-      // Garante que todas as imagens carregaram
-      await page.evaluate(() => {
-        const images = Array.from(document.querySelectorAll("img"));
-        return Promise.all(
-          images.map((img) => {
-            if (img.complete) return Promise.resolve();
-            return new Promise<void>((resolve) => {
-              img.addEventListener("load", () => resolve());
-              img.addEventListener("error", () => resolve()); // ignora erro de imagem
-            });
+      // Aguarda fontes remotas (Google Fonts) e imagens
+      await Promise.race([
+        page.evaluate(() =>
+          document.fonts.ready.then(() => {
+            const imgs = Array.from(document.querySelectorAll<HTMLImageElement>("img"));
+            return Promise.all(imgs.map((img) =>
+              img.complete ? Promise.resolve() : new Promise<void>((res) => {
+                img.addEventListener("load", () => res());
+                img.addEventListener("error", () => res());
+              })
+            ));
           })
-        );
-      });
+        ),
+        sleep(1_500), // timeout máximo de espera
+      ]);
 
       const sanitized = companyName
         .toLowerCase()
@@ -70,14 +69,15 @@ export class ScreenshotGenerator {
         .replace(/-+/g, "-")
         .slice(0, 50);
 
-      const filename = `${sanitized}-${Date.now()}.png`;
+      const filename = `${sanitized}-${Date.now()}.jpg`;
       const outputPath = path.join(config.paths.screenshots, filename);
 
-      // Screenshot do viewport (acima da dobra - área de maior impacto visual)
+      // Screenshot do viewport — JPEG 88% reduz tamanho em ~7x vs PNG sem impacto visual
       await page.screenshot({
         path: outputPath,
         clip: { x: 0, y: 0, width: 1440, height: 900 },
-        type: "png",
+        type: "jpeg",
+        quality: 88,
       });
 
       log.info({ company: companyName, file: filename }, "Screenshot capturada");
@@ -86,35 +86,6 @@ export class ScreenshotGenerator {
         filePath: path.resolve(outputPath),
         width: 1440,
         height: 900,
-      };
-    } finally {
-      await page.close();
-    }
-  }
-
-  async captureFullPage(htmlFilePath: string, companyName: string): Promise<ScreenshotResult> {
-    if (!this.browser) await this.initialize();
-
-    const page = await this.browser!.newPage();
-
-    try {
-      await page.setViewportSize({ width: 1440, height: 900 });
-      const fileUrl = `file:///${htmlFilePath.replace(/\\/g, "/")}`;
-      await page.goto(fileUrl, { waitUntil: "networkidle", timeout: 30_000 });
-      await sleep(2_000);
-
-      const sanitized = companyName.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 50);
-      const filename = `${sanitized}-full-${Date.now()}.png`;
-      const outputPath = path.join(config.paths.screenshots, filename);
-
-      await page.screenshot({ path: outputPath, fullPage: true, type: "png" });
-
-      const viewport = page.viewportSize() ?? { width: 1440, height: 900 };
-
-      return {
-        filePath: path.resolve(outputPath),
-        width: viewport.width,
-        height: viewport.height,
       };
     } finally {
       await page.close();

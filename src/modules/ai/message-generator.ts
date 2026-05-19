@@ -1,6 +1,8 @@
+import { createHash } from "crypto";
 import { deepseekChat } from "../../utils/deepseek-client.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import { withRetry } from "../../utils/retry.js";
+import { getCached, setCached, cacheTTL } from "../../utils/ai-cache.js";
 import type { BusinessEnriched } from "../../types/business.types.js";
 
 const log = createModuleLogger("ai:message-generator");
@@ -16,6 +18,20 @@ const MESSAGE_TEMPLATES = [
 
 export class MessageGenerator {
   async generate(business: BusinessEnriched): Promise<string> {
+    const cacheKey = `msg:${createHash("md5").update(`${business.placeId}|${business.niche}`).digest("hex")}`;
+
+    const cached = await getCached<string>(cacheKey);
+    if (cached) {
+      log.debug({ name: business.name }, "Mensagem obtida do cache");
+      return cached;
+    }
+
+    const message = await this.generateMessage(business);
+    await setCached(cacheKey, message, cacheTTL.CONTENT);
+    return message;
+  }
+
+  private async generateMessage(business: BusinessEnriched): Promise<string> {
     // 30% das vezes usa mensagem personalizada pela IA para variedade
     if (Math.random() < 0.3) {
       try {

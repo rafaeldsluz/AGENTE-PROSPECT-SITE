@@ -16,6 +16,7 @@ const NICHE_COLORS: Record<string, { primaryColor: string; accentColor: string }
   loja:        { primaryColor: "#0f0f23", accentColor: "#8b5cf6" },
   servicos:    { primaryColor: "#0a1628", accentColor: "#3b82f6" },
   advogado:    { primaryColor: "#0a0e1a", accentColor: "#c9a84c" },
+  comercio:    { primaryColor: "#0f1923", accentColor: "#f59e0b" },
   outros:      { primaryColor: "#111827", accentColor: "#6366f1" },
 };
 

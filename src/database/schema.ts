@@ -87,6 +87,7 @@ export const leads = pgTable(
     statusIdx: index("leads_status_idx").on(t.status),
     cityIdx: index("leads_city_idx").on(t.city),
     scoreIdx: index("leads_score_idx").on(t.score),
+    updatedAtIdx: index("leads_updated_at_idx").on(t.updatedAt),
   })
 );
 

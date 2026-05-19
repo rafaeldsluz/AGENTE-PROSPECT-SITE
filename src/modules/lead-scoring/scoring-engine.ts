@@ -3,16 +3,12 @@ import type { BusinessValidated, BusinessEnriched, ScoreBreakdown, Niche } from 
 
 const log = createModuleLogger("lead-scoring");
 
-// Nichos com maior potencial de conversão (mais receptivos a presença digital)
+// Nichos ativos — devem corresponder exatamente ao tipo Niche em business.types.ts
 const NICHE_RELEVANCE: Record<Niche, number> = {
-  advogado: 10,  // >90% sem site profissional, alta capacidade de pagamento
+  advogado: 10,
   clinica: 10,
-  estetica: 9,
-  academia: 8,
-  restaurante: 8,
-  oficina: 7,
   imoveis: 7,
-  loja: 6,
+  comercio: 7,
   servicos: 5,
   outros: 3,
 };

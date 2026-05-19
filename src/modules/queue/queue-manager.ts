@@ -68,21 +68,30 @@ export async function enqueueScrapeJobs(
   maxLeadsPerRun: number,
   queries: string[],
 ): Promise<number> {
-  let jobCount = 0;
-  for (const city of targetCities) {
-    for (const query of queries) {
-      const jobId = `scrape-${city}-${query}-${Date.now()}-${jobCount}`;
-      const delay = jobCount * 30_000;
-      await scrapeQueue.add(jobId, {
-        city,
-        niche: QUERY_TO_NICHE[query] ?? query,
-        searchQuery: query,
-        maxResults: Math.ceil(maxLeadsPerRun / queries.length),
-      }, { delay });
-      jobCount++;
-    }
+  const [waiting, active, delayed] = await Promise.all([
+    scrapeQueue.getWaitingCount(),
+    scrapeQueue.getActiveCount(),
+    scrapeQueue.getDelayedCount(),
+  ]);
+
+  if (waiting + active + delayed > 0) {
+    log.info({ waiting, active, delayed }, "Scraping já em andamento, enfileiramento ignorado");
+    return 0;
   }
-  return jobCount;
+
+  const jobs = targetCities.flatMap((city) =>
+    queries.map((query) => {
+      const jobId = `scrape-${city}-${query}`;
+      return {
+        name: jobId,
+        data: { city, niche: QUERY_TO_NICHE[query] ?? query, searchQuery: query, maxResults: maxLeadsPerRun },
+        opts: { jobId },
+      };
+    })
+  );
+
+  await scrapeQueue.addBulk(jobs);
+  return jobs.length;
 }
 
 export async function getDispatchFailedJobs(limit = 10) {

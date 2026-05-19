@@ -5,16 +5,18 @@ import { createDashboardServer } from "./dashboard/server.js";
 import { checkConnection, closeConnection } from "./database/client.js";
 import { leadRepository } from "./database/repositories/lead.repository.js";
 import {
-  scrapeQueue,
   pipelineQueue,
   getQueueStats,
   closeQueues,
+  enqueueScrapeJobs,
 } from "./modules/queue/queue-manager.js";
 import { createScrapeWorker } from "./modules/queue/workers/scrape.worker.js";
 import { createPipelineWorker } from "./modules/queue/workers/pipeline.worker.js";
 import { createDispatchWorker } from "./modules/queue/workers/dispatch.worker.js";
 import { getNicheQueries } from "./modules/scraper/google-maps.scraper.js";
 import { screenshotGenerator } from "./modules/screenshot/screenshot-generator.js";
+import { initManualOverride } from "./modules/dispatch-schedule.js";
+import { cleanOldOutputFiles } from "./utils/output-cleaner.js";
 import type { Worker } from "bullmq";
 
 const log = createModuleLogger("orchestrator");
@@ -28,6 +30,8 @@ export class Orchestrator {
     log.info("Iniciando Sistema de Prospecção Automatizada");
 
     await this.checkInfrastructure();
+    await initManualOverride();
+    await cleanOldOutputFiles(config.paths.pages, config.paths.screenshots);
     this.dashboardServer = createDashboardServer(config.app.dashboardPort);
     await this.startWorkers();
     await this.scheduleScraping();
@@ -70,37 +74,13 @@ export class Orchestrator {
     const { targetCities, targetNiches, maxLeadsPerRun } = config.scraping;
     const queries = getNicheQueries(targetNiches);
 
-    log.info({
-      cities: targetCities.length,
-      queries: queries.length,
-      maxLeadsPerRun,
-    }, "Agendando jobs de scraping");
+    log.info({ cities: targetCities.length, queries: queries.length, maxLeadsPerRun }, "Agendando jobs de scraping");
 
-    let jobCount = 0;
+    const jobCount = await enqueueScrapeJobs(targetCities, targetNiches, maxLeadsPerRun, queries);
 
-    for (const city of targetCities) {
-      for (const query of queries) {
-        const jobId = `scrape-${city}-${query}-${Date.now()}`;
-
-        // Delay crescente entre jobs para evitar bloqueio simultâneo
-        const delay = jobCount * 30_000; // 30s entre cada job
-
-        await scrapeQueue.add(
-          jobId,
-          {
-            city,
-            niche: query.split(" ")[0] ?? query,
-            searchQuery: query,
-            maxResults: Math.ceil(maxLeadsPerRun / queries.length),
-          },
-          { delay }
-        );
-
-        jobCount++;
-      }
+    if (jobCount > 0) {
+      log.info({ totalJobs: jobCount }, "Jobs de scraping agendados");
     }
-
-    log.info({ totalJobs: jobCount }, "Jobs de scraping agendados");
   }
 
   async runPipelineForExistingLeads(): Promise<void> {

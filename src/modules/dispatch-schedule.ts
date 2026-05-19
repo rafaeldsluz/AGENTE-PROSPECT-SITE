@@ -1,8 +1,22 @@
 // Controle de janela de disparo e override manual.
 // Brasil (São Paulo) é fixo em UTC-3 desde 2019 (sem horário de verão).
 // Janela padrão: 08:00–18:00 BRT = 11:00–21:00 UTC.
+//
+// Override persiste no Redis (TTL 12h) para sobreviver a reinícios do processo.
+// Em memória mantemos cache local para leitura síncrona de alta frequência.
+
+import { getCached, setCached } from "../utils/ai-cache.js";
+
+const OVERRIDE_KEY = "dispatch:manual_override";
+const OVERRIDE_TTL_S = 12 * 3600; // expira automaticamente após 12h
 
 let _manualOverride = false;
+
+// Chame uma vez no startup para restaurar o estado salvo.
+export async function initManualOverride(): Promise<void> {
+  const stored = await getCached<boolean>(OVERRIDE_KEY);
+  if (stored !== null) _manualOverride = stored;
+}
 
 function getBRTHour(): number {
   // São Paulo = UTC-3, sem DST desde 2019
@@ -42,8 +56,9 @@ export function isManualOverrideActive(): boolean {
   return _manualOverride;
 }
 
-export function setManualOverride(value: boolean): void {
+export async function setManualOverride(value: boolean): Promise<void> {
   _manualOverride = value;
+  await setCached(OVERRIDE_KEY, value, OVERRIDE_TTL_S);
 }
 
 export function getDispatchStatus(startHour = 8, endHour = 18) {

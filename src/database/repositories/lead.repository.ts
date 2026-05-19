@@ -83,7 +83,7 @@ export class LeadRepository {
       .where(eq(leads.id, id));
   }
 
-  async updateEnrichment(id: string, enriched: BusinessEnriched): Promise<void> {
+  async updateEnrichment(id: string, enriched: BusinessEnriched, status: LeadStatus = "scored"): Promise<void> {
     await db
       .update(leads)
       .set({
@@ -91,7 +91,7 @@ export class LeadRepository {
         nicheConfidence: enriched.nicheConfidence,
         score: enriched.score,
         scoreBreakdown: enriched.scoreBreakdown,
-        status: "scored",
+        status,
         updatedAt: new Date(),
       })
       .where(eq(leads.id, id));

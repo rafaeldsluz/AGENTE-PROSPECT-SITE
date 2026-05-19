@@ -11,6 +11,7 @@ import { metricsRegistry, updatePrometheusMetrics } from "../metrics/index.js";
 import { createModuleLogger } from "../utils/logger.js";
 import { config } from "../config/index.js";
 import { getDispatchStatus, setManualOverride } from "../modules/dispatch-schedule.js";
+
 import { dispatchRepository } from "../database/repositories/dispatch.repository.js";
 
 const log = createModuleLogger("dashboard");
@@ -48,6 +49,8 @@ const NICHE_ICONS: Record<string, string> = {
   estetica: "✂️",
   loja: "🛍️",
   servicos: "⚙️",
+  advogado: "⚖️",
+  comercio: "🏪",
   outros: "📦",
 };
 
@@ -131,7 +134,15 @@ async function getStats(): Promise<StatsSnapshot> {
 
 // ── HTML template ─────────────────────────────────────────────────────────────
 
+let _dashboardHtml: string | null = null;
+
 function getDashboardHtml(): string {
+  if (_dashboardHtml) return _dashboardHtml;
+  _dashboardHtml = buildDashboardHtml();
+  return _dashboardHtml;
+}
+
+function buildDashboardHtml(): string {
   const statusLabelsJson = JSON.stringify(STATUS_LABELS);
   const statusColorsJson = JSON.stringify(STATUS_COLORS);
   const nicheIconsJson   = JSON.stringify(NICHE_ICONS);
@@ -404,7 +415,8 @@ const PIPELINE_STAGES = ${pipelineStagesJson};
 const NICHE_COLORS = {
   oficina:'#f97316', clinica:'#0ea5e9', restaurante:'#dc2626',
   academia:'#eab308', imoveis:'#10b981', estetica:'#ec4899',
-  loja:'#a78bfa', servicos:'#94a3b8', outros:'#64748b',
+  loja:'#a78bfa', servicos:'#94a3b8', advogado:'#8b5cf6',
+  comercio:'#f59e0b', outros:'#64748b',
 };
 
 const RETRYABLE = new Set(['scraped','validated','scored','page_generated','screenshot_ready','disqualified']);
@@ -464,7 +476,7 @@ function updateScrapeBtn(scrapeStats) {
     btn.textContent = \`⏳ Scraping em andamento (\${waiting} na fila)\`;
     btn.style.opacity = '0.6';
     btn.style.cursor = 'not-allowed';
-  } else if (!btn._userTriggered) {
+  } else {
     btn.disabled = false;
     btn.textContent = '🔍 Iniciar Scraping';
     btn.style.opacity = '';
@@ -474,7 +486,6 @@ function updateScrapeBtn(scrapeStats) {
 function startScraping() {
   const btn = document.getElementById('scrape-btn');
   if (!btn || btn.disabled) return;
-  btn._userTriggered = true;
   btn.disabled = true;
   btn.textContent = '⏳ Enfileirando...';
   btn.style.opacity = '0.6';
@@ -482,20 +493,21 @@ function startScraping() {
   fetch('/api/scrape/start', { method: 'POST' })
     .then(r => r.json())
     .then(d => {
-      btn._userTriggered = false;
       if (d.ok) {
         showToast('🔍', 'Scraping iniciado', d.jobsEnqueued + ' queries enfileiradas', false);
+        // botão permanece desabilitado — updateScrapeBtn reabilita quando a fila esvaziar
       } else {
-        btn.textContent = '❌ Erro';
+        showToast('⏳', 'Scraping já em andamento', 'Aguarde a fila atual terminar', false);
         btn.disabled = false;
+        btn.textContent = '🔍 Iniciar Scraping';
         btn.style.opacity = '';
         btn.style.cursor = '';
       }
     })
     .catch(() => {
-      btn._userTriggered = false;
-      btn.textContent = '❌ Erro';
+      showToast('❌', 'Erro ao iniciar scraping', 'Verifique os logs do servidor', true);
       btn.disabled = false;
+      btn.textContent = '🔍 Iniciar Scraping';
       btn.style.opacity = '';
       btn.style.cursor = '';
     });
@@ -858,7 +870,7 @@ function connect() {
   }
   const es = new EventSource('/events');
   es.onopen    = () => setLive(true);
-  es.onmessage = (e) => { try { renderAll(JSON.parse(e.data)); } catch {} };
+  es.onmessage = (e) => { try { renderAll(JSON.parse(e.data)); } catch(err) { console.error('[dashboard] renderAll error:', err); } };
   es.onerror   = () => { setLive(false); es.close(); setTimeout(connect, 5000); };
 }
 connect();
@@ -876,6 +888,7 @@ export function createDashboardServer(port = 3000): Server {
 
   const sseClients = new Set<Response>();
   let broadcastInterval: ReturnType<typeof setInterval> | null = null;
+  let _scrapeEnqueueing = false;
 
   async function broadcast(): Promise<void> {
     if (sseClients.size === 0) return;
@@ -893,6 +906,9 @@ export function createDashboardServer(port = 3000): Server {
     res.json({ status: "ok", uptime: process.uptime(), ts: Date.now() });
   });
 
+  // Apply auth to all protected routes
+  app.use(basicAuthMiddleware);
+
   app.get("/metrics", async (_req: Request, res: Response) => {
     try {
       const stats = await getStats();
@@ -903,9 +919,6 @@ export function createDashboardServer(port = 3000): Server {
       res.status(500).send(String(err));
     }
   });
-
-  // Apply auth to all other routes
-  app.use(basicAuthMiddleware);
 
   app.get("/events", (req: Request, res: Response) => {
     res.setHeader("Content-Type", "text/event-stream");
@@ -927,12 +940,26 @@ export function createDashboardServer(port = 3000): Server {
   });
 
   app.post("/api/scrape/start", async (_req: Request, res: Response) => {
-    const { targetCities, targetNiches, maxLeadsPerRun } = config.scraping;
-    const queries = getNicheQueries(targetNiches);
-    const total = await enqueueScrapeJobs(targetCities, targetNiches, maxLeadsPerRun, queries);
-    _cachedStats = null;
-    log.info({ total }, "Scraping iniciado manualmente via dashboard");
-    res.json({ ok: true, jobsEnqueued: total });
+    // Flag síncrona antes do primeiro await — previne race condition entre requests simultâneos
+    if (_scrapeEnqueueing) {
+      res.status(409).json({ ok: false, error: "Scraping já em andamento" });
+      return;
+    }
+    _scrapeEnqueueing = true;
+    try {
+      const { targetCities, targetNiches, maxLeadsPerRun } = config.scraping;
+      const queries = getNicheQueries(targetNiches);
+      const total = await enqueueScrapeJobs(targetCities, targetNiches, maxLeadsPerRun, queries);
+      _cachedStats = null;
+      if (total === 0) {
+        res.status(409).json({ ok: false, error: "Scraping já em andamento" });
+        return;
+      }
+      log.info({ total }, "Scraping iniciado manualmente via dashboard");
+      res.json({ ok: true, jobsEnqueued: total });
+    } finally {
+      _scrapeEnqueueing = false;
+    }
   });
 
   app.get("/api/leads/:id", async (req: Request, res: Response) => {
@@ -957,11 +984,11 @@ export function createDashboardServer(port = 3000): Server {
     res.json(getDispatchStatus());
   });
 
-  app.post("/api/dispatch/override", (req: Request, res: Response) => {
+  app.post("/api/dispatch/override", async (req: Request, res: Response) => {
     const body = req.body as { enabled?: boolean };
     const current = getDispatchStatus();
     const newValue = typeof body.enabled === "boolean" ? body.enabled : !current.manualOverride;
-    setManualOverride(newValue);
+    await setManualOverride(newValue);
     log.info({ manualOverride: newValue }, "Override manual de disparo alterado via dashboard");
     res.json({ ok: true, ...getDispatchStatus() });
   });

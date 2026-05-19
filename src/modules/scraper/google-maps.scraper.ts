@@ -98,36 +98,47 @@ export class GoogleMapsScraper {
         "--lang=pt-BR",
       ],
     });
+    this.context = await this.createContext();
+    log.info("Browser Playwright inicializado (reutilizável)");
+  }
 
+  private async createContext(): Promise<BrowserContext> {
+    if (!this.browser) throw new Error("Browser não inicializado");
     const userAgent = new UserAgent({ deviceCategory: "desktop" });
-
-    this.context = await this.browser.newContext({
+    const ctx = await this.browser.newContext({
       userAgent: userAgent.toString(),
       locale: "pt-BR",
       timezoneId: "America/Sao_Paulo",
       viewport: { width: 1366, height: 768 },
       extraHTTPHeaders: { "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8" },
     });
-
-    await this.context.addInitScript(() => {
+    await ctx.addInitScript(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => undefined });
       Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
       Object.defineProperty(navigator, "languages", { get: () => ["pt-BR", "pt"] });
     });
-
-    // Bloqueia recursos desnecessários — maior ganho de velocidade
-    await this.context.route("**/*", (route) => {
+    await ctx.route("**/*", (route) => {
       if (BLOCKED_RESOURCES.has(route.request().resourceType())) {
         route.abort();
       } else {
         route.continue();
       }
     });
-
-    log.info("Browser Playwright inicializado (reutilizável)");
+    return ctx;
   }
 
-  async scrapeQuery(query: string, options: ScraperOptions): Promise<BusinessRaw[]> {
+  // Descarta cookies/sessão anterior para evitar detecção como bot pelo Google.
+  async resetContext(): Promise<void> {
+    await this.context?.close();
+    this.context = await this.createContext();
+    log.info("Contexto do browser resetado (nova sessão)");
+  }
+
+  async scrapeQuery(
+    query: string,
+    options: ScraperOptions,
+    onBusiness?: (b: BusinessRaw) => Promise<void>,
+  ): Promise<BusinessRaw[]> {
     if (!this.context) throw new Error("Scraper não inicializado");
 
     const searchQuery = `${query} em ${options.city}`;
@@ -150,7 +161,19 @@ export class GoogleMapsScraper {
 
       await this.handleCookieConsent(page);
 
-      const listingResults = await this.extractListings(page, options.maxResults, options.city);
+      // Detecta bloqueio/CAPTCHA do Google antes de tentar extrair
+      const currentUrl = page.url();
+      if (currentUrl.includes("/sorry/") || currentUrl.includes("sorry.google")) {
+        log.warn({ query }, "Google bloqueou a requisição (CAPTCHA/sorry) — pulando query");
+        return results;
+      }
+      const hasCaptcha = await page.$('form#captcha-form, div#recaptcha, iframe[src*="recaptcha"]').catch(() => null);
+      if (hasCaptcha) {
+        log.warn({ query }, "Google exibiu CAPTCHA — pulando query");
+        return results;
+      }
+
+      const listingResults = await this.extractListings(page, options.maxResults, options.city, onBusiness);
       results.push(...listingResults);
     } catch (err) {
       log.error({ query, error: String(err) }, "Erro ao buscar no Google Maps");
@@ -173,7 +196,12 @@ export class GoogleMapsScraper {
     }
   }
 
-  private async extractListings(page: Page, maxResults: number, city: string): Promise<BusinessRaw[]> {
+  private async extractListings(
+    page: Page,
+    maxResults: number,
+    city: string,
+    onBusiness?: (b: BusinessRaw) => Promise<void>,
+  ): Promise<BusinessRaw[]> {
     const results: BusinessRaw[] = [];
     const sidebar = page.locator('[role="feed"]');
 
@@ -232,6 +260,13 @@ export class GoogleMapsScraper {
 
           const business = await this.extractBusinessDetails(page, city);
           if (business) {
+            if (onBusiness) {
+              try {
+                await onBusiness(business);
+              } catch (cbErr) {
+                log.warn({ name: business.name, error: String(cbErr) }, "Erro no callback de negócio");
+              }
+            }
             results.push(business);
             log.debug({ name: business.name }, "Business extraído");
           }
@@ -273,8 +308,10 @@ export class GoogleMapsScraper {
         if (!name) return null;
 
         // Filtra textos genéricos da UI do Google Maps que aparecem em race condition
-        const GENERIC_NAMES = ["resultados", "results", "pesquisar", "search", "patrocinado", "sponsored"];
-        if (GENERIC_NAMES.includes(name.toLowerCase())) return null;
+        // Usa startsWith para cobrir variações como "Patrocinado", "Patrocinado ·", etc.
+        const lowerName = name.toLowerCase();
+        const GENERIC_PREFIXES = ["resultados", "results", "pesquisar", "search", "patrocinado", "sponsored"];
+        if (GENERIC_PREFIXES.some(p => lowerName.startsWith(p))) return null;
 
         // Categoria
         const categoryEl =

@@ -17,13 +17,8 @@ import type { Lead } from "../../../database/schema.js";
 
 const log = createModuleLogger("worker:pipeline");
 
-// ── Stage helpers ─────────────────────────────────────────────────────────────
-
-async function stageValidate(lead: Lead): Promise<
-  | { ok: true; business: BusinessValidated }
-  | { ok: false; reason: string }
-> {
-  const businessRaw: BusinessRaw = {
+function leadToBusinessRaw(lead: Lead): BusinessRaw {
+  return {
     placeId: lead.placeId,
     name: lead.name,
     category: lead.category,
@@ -41,7 +36,15 @@ async function stageValidate(lead: Lead): Promise<
     googleMapsUrl: lead.googleMapsUrl,
     scrapedAt: lead.scrapedAt,
   };
+}
 
+// ── Stage helpers ─────────────────────────────────────────────────────────────
+
+async function stageValidate(lead: Lead): Promise<
+  | { ok: true; business: BusinessValidated }
+  | { ok: false; reason: string }
+> {
+  const businessRaw = leadToBusinessRaw(lead);
   const validation = await websiteValidator.validate(businessRaw);
   await leadRepository.updateValidation(lead.id, { ...businessRaw, validation });
 
@@ -61,17 +64,17 @@ async function stageEnrich(
     ? { niche: sourceNiche as import("../../../types/business.types.js").Niche, confidence: 0.97, reasoning: "Derivado da query de busca" }
     : await nicheClassifier.classify(business.name, business.category);
   const enriched = scoringEngine.score(business, nicheResult.niche, nicheResult.confidence);
-  await leadRepository.updateEnrichment(leadId, enriched);
-
-  if (enriched.score < config.scraping.minScore) {
-    await leadRepository.updateStatus(leadId, "disqualified");
-    return { ok: false, reason: `score insuficiente: ${enriched.score} (mínimo: ${config.scraping.minScore})` };
-  }
 
   const targetPhone = enriched.whatsapp ?? enriched.phone;
-  if (!targetPhone) {
-    await leadRepository.updateStatus(leadId, "disqualified");
-    return { ok: false, reason: "sem telefone" };
+  const qualifies = enriched.score >= config.scraping.minScore && !!targetPhone;
+  const finalStatus = qualifies ? "scored" : "disqualified";
+  await leadRepository.updateEnrichment(leadId, enriched, finalStatus);
+
+  if (!qualifies) {
+    const reason = enriched.score < config.scraping.minScore
+      ? `score insuficiente: ${enriched.score} (mínimo: ${config.scraping.minScore})`
+      : "sem telefone";
+    return { ok: false, reason };
   }
 
   return { ok: true, enriched };
