@@ -454,25 +454,50 @@ function scoreBar(v) {
 }
 
 // ── Scraping manual ──────────────────────────────────────────────────────
+function updateScrapeBtn(scrapeStats) {
+  const btn = document.getElementById('scrape-btn');
+  if (!btn) return;
+  const { waiting = 0, active = 0 } = scrapeStats || {};
+  const running = waiting > 0 || active > 0;
+  if (running) {
+    btn.disabled = true;
+    btn.textContent = \`⏳ Scraping em andamento (\${waiting} na fila)\`;
+    btn.style.opacity = '0.6';
+    btn.style.cursor = 'not-allowed';
+  } else if (!btn._userTriggered) {
+    btn.disabled = false;
+    btn.textContent = '🔍 Iniciar Scraping';
+    btn.style.opacity = '';
+    btn.style.cursor = '';
+  }
+}
 function startScraping() {
   const btn = document.getElementById('scrape-btn');
   if (!btn || btn.disabled) return;
+  btn._userTriggered = true;
   btn.disabled = true;
   btn.textContent = '⏳ Enfileirando...';
+  btn.style.opacity = '0.6';
+  btn.style.cursor = 'not-allowed';
   fetch('/api/scrape/start', { method: 'POST' })
     .then(r => r.json())
     .then(d => {
+      btn._userTriggered = false;
       if (d.ok) {
-        btn.textContent = '✅ ' + d.jobsEnqueued + ' jobs';
         showToast('🔍', 'Scraping iniciado', d.jobsEnqueued + ' queries enfileiradas', false);
       } else {
         btn.textContent = '❌ Erro';
+        btn.disabled = false;
+        btn.style.opacity = '';
+        btn.style.cursor = '';
       }
-      setTimeout(() => { btn.textContent = '🔍 Iniciar Scraping'; btn.disabled = false; }, 4000);
     })
     .catch(() => {
+      btn._userTriggered = false;
       btn.textContent = '❌ Erro';
-      setTimeout(() => { btn.textContent = '🔍 Iniciar Scraping'; btn.disabled = false; }, 3000);
+      btn.disabled = false;
+      btn.style.opacity = '';
+      btn.style.cursor = '';
     });
 }
 window.startScraping = startScraping;
@@ -812,6 +837,7 @@ function renderAll(data) {
   renderLeads(data);
   renderFailures(data);
   detectNewQualified(data.recentLeads || []);
+  updateScrapeBtn(data.queueStats?.scrape);
   const lu = document.getElementById('last-update');
   if (lu) lu.textContent = 'há ' + timeAgo(data.timestamp);
 }
