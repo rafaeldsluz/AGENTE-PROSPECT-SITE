@@ -21,6 +21,7 @@ export const nicheEnum = pgEnum("niche", [
   "loja",
   "servicos",
   "advogado",
+  "comercio",
   "outros",
 ]);
 
