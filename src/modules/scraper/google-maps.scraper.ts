@@ -21,50 +21,63 @@ interface ScraperOptions {
 // Regra geral: só incluir queries de negócios que (a) frequentemente não têm site
 // e (b) teriam ganho real com presença digital profissional.
 const NICHE_QUERIES: Record<string, string[]> = {
-  // Mecânicos: geralmente sem site, dependem de indicação — site profissional é upgrade claro
+  // Serviços automotivos especializados — cliente busca ativamente, não só por indicação
   oficina: [
-    "oficina mecânica", "auto center", "mecânico de carros",
-    "funilaria e pintura", "auto elétrica", "suspensão e freios",
+    "auto center",
+    "funilaria e pintura",
+    "auto elétrica",
+    "suspensão e freios",
   ],
-  // Saúde: clínicas pequenas e consultórios solo raramente têm site profissional
+  // Saúde: clínicas e consultórios solo raramente têm site profissional
   clinica: [
-    "clínica médica", "consultório médico", "clínica odontológica", "dentista",
-    "clínica veterinária", "fisioterapia", "psicólogo",
+    "clínica odontológica",
+    "dentista",
+    "clínica veterinária",
+    "fisioterapia",
+    "psicólogo",
+    "clínica médica",
   ],
-  // Alimentação: restaurantes locais vivem de Instagram/WhatsApp — site aumenta discovery
+  // Alimentação: pizzarias e hamburguerias convertem bem — cliente busca por tipo de comida
   restaurante: [
-    "restaurante", "lanchonete", "pizzaria", "hamburgueria",
-    "churrascaria", "café e bistrô", "marmitex delivery",
+    "pizzaria",
+    "hamburgueria",
+    "churrascaria",
+    "restaurante",
   ],
   // Fitness: studios boutique e academias independentes raramente têm site
   academia: [
-    "academia de ginástica", "crossfit", "musculação",
-    "pilates studio", "studio de yoga", "estúdio fitness",
+    "academia de ginástica",
+    "crossfit",
+    "pilates studio",
+    "studio de yoga",
   ],
-  // Imóveis: corretores independentes e pequenas imobiliárias com só Instagram
+  // Imóveis: corretores independentes com só Instagram perdem leads do Google
   imoveis: [
-    "imobiliária", "corretor de imóveis", "consultoria imobiliária",
-    "lançamentos imobiliários",
+    "imobiliária",
+    "corretor de imóveis",
+    "consultoria imobiliária",
   ],
-  // Estética: salões e clínicas de beleza são dos que mais convertem — vivem do Instagram
+  // Estética: maior taxa de conversão — vivem do Instagram, site profissional é diferencial
   estetica: [
-    "salão de beleza", "barbearia", "estética", "nail art",
-    "clínica estética", "micropigmentação", "depilação a laser",
+    "salão de beleza",
+    "barbearia",
+    "clínica estética",
+    "micropigmentação",
+    "depilação a laser",
   ],
-  // Lojas físicas locais que dependem só de redes sociais para atrair clientes
-  loja: [
-    "loja de roupas", "loja de calçados", "pet shop",
-    "farmácia de manipulação", "ótica", "loja de móveis planejados",
-  ],
-  // Serviços técnicos que são contratados por busca no Google — site é essencial
+  // Serviços de alta intenção de busca — contratados diretamente pelo Google
   servicos: [
-    "dedetizadora", "chaveiro", "encanador", "eletricista",
-    "empresa de limpeza", "marmoraria",
+    "dedetizadora",
+    "empresa de limpeza",
+    "marmoraria",
+    "chaveiro",
   ],
   // Advogados solos e pequenas bancas têm presença digital quase zero
   advogado: [
-    "escritório de advocacia", "advogado trabalhista",
-    "advogado criminal", "consultório jurídico", "advogado imobiliário",
+    "escritório de advocacia",
+    "advogado trabalhista",
+    "advogado criminal",
+    "advogado imobiliário",
   ],
 };
 
