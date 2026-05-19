@@ -50,6 +50,19 @@ const NICHE_QUERIES: Record<string, string[]> = {
     "advogado criminal",
     "advogado imobiliário",
   ],
+  // Comércio local: busca ativa no Google, pouca presença digital profissional
+  comercio: [
+    "ótica",
+    "assistência técnica celular",
+    "assistência técnica notebook",
+    "gráfica",
+    "loja de uniformes",
+    "pet shop",
+    "lavanderia",
+    "loja de materiais de construção",
+    "ferragem",
+    "vidraçaria",
+  ],
 };
 
 // Mapa reverso: query → niche (ex: "escritório de advocacia" → "advogado")
@@ -370,8 +383,14 @@ export class GoogleMapsScraper {
           });
         const photoUrls = [...new Set(cdnImgs)].slice(0, 10);
 
-        // Logo — primeira imagem de negócio disponível (capa do perfil)
-        const logoUrl = photoUrls[0] ?? null;
+        // Logo — tenta foto de perfil do Business Profile primeiro (imagem quadrada perto do h1),
+        // depois capa da galeria, depois primeira foto disponível
+        const profileImg = main.querySelector<HTMLImageElement>(
+          'img[aria-label], button[aria-label*="foto"] img, [data-photo-index="0"] img, .RZ66Rb img'
+        );
+        const profileSrc = profileImg?.src ?? "";
+        const isValidProfile = profileSrc.includes("googleusercontent") && !profileSrc.includes("-c0x");
+        const logoUrl = (isValidProfile ? profileSrc : null) ?? photoUrls[0] ?? null;
 
         // Redes sociais declaradas no Google Business Profile
         const allAnchors = Array.from(main.querySelectorAll<HTMLAnchorElement>("a[href]"));

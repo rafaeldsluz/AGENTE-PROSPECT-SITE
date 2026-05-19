@@ -13,6 +13,7 @@ const NICHE_LABELS: Record<string, string> = {
   imoveis: "Imobiliária / Corretagem de Imóveis",
   servicos: "Prestação de Serviços",
   advogado: "Escritório de Advocacia",
+  comercio: "Comércio Local",
   outros: "Empresa Local",
 };
 
@@ -21,6 +22,7 @@ const NICHE_TONE: Record<string, string> = {
   imoveis: "seguro e aspiracional, foco em realização e patrimônio",
   servicos: "competente e ágil, foco em solução e praticidade",
   advogado: "sério e confiável, foco em defesa e tranquilidade",
+  comercio: "próximo e confiável, foco em variedade, qualidade e atendimento local",
   outros: "profissional e próximo, foco em atendimento e resultado",
 };
 

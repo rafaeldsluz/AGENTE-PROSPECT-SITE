@@ -8,6 +8,7 @@ import { renderClinicaTemplate } from "./templates/clinica.template.js";
 import { renderImoveisTemplate } from "./templates/imoveis.template.js";
 import { renderAdvogadoTemplate } from "./templates/advogado.template.js";
 import { renderOficinaTemplate } from "./templates/oficina.template.js";
+import { renderComercioTemplate } from "./templates/comercio.template.js";
 
 const log = createModuleLogger("renderer");
 
@@ -17,8 +18,9 @@ const TEMPLATE_MAP: Record<Niche, TemplateRenderer> = {
   clinica: renderClinicaTemplate,
   imoveis: renderImoveisTemplate,
   advogado: renderAdvogadoTemplate,
-  servicos: renderOficinaTemplate,  // layout técnico/profissional
-  outros: renderClinicaTemplate,    // fallback neutro
+  servicos: renderOficinaTemplate,
+  comercio: renderComercioTemplate,
+  outros: renderClinicaTemplate,
 };
 
 function sanitizeFilename(name: string): string {
