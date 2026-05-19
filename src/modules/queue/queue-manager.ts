@@ -3,6 +3,7 @@ import IORedis from "ioredis";
 import { config } from "../../config/index.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import type { ScrapeJobData, PipelineJobData, DispatchJobData } from "../../types/queue.types.js";
+import { QUERY_TO_NICHE } from "../scraper/google-maps.scraper.js";
 
 const log = createModuleLogger("queue");
 
@@ -74,7 +75,7 @@ export async function enqueueScrapeJobs(
       const delay = jobCount * 30_000;
       await scrapeQueue.add(jobId, {
         city,
-        niche: query.split(" ")[0] ?? query,
+        niche: QUERY_TO_NICHE[query] ?? query,
         searchQuery: query,
         maxResults: Math.ceil(maxLeadsPerRun / queries.length),
       }, { delay });

@@ -68,6 +68,15 @@ const NICHE_QUERIES: Record<string, string[]> = {
   ],
 };
 
+// Mapa reverso: query → niche (ex: "escritório de advocacia" → "advogado")
+export const QUERY_TO_NICHE: Record<string, string> = Object.entries(NICHE_QUERIES).reduce(
+  (acc, [niche, queries]) => {
+    for (const q of queries) acc[q] = niche;
+    return acc;
+  },
+  {} as Record<string, string>
+);
+
 export function getNicheQueries(niches: string[]): string[] {
   if (niches.length === 0) {
     return Object.values(NICHE_QUERIES).flat();
@@ -265,6 +274,10 @@ export class GoogleMapsScraper {
 
         const name = main.querySelector("h1")?.textContent?.trim() ?? null;
         if (!name) return null;
+
+        // Filtra textos genéricos da UI do Google Maps que aparecem em race condition
+        const GENERIC_NAMES = ["resultados", "results", "pesquisar", "search"];
+        if (GENERIC_NAMES.includes(name.toLowerCase())) return null;
 
         // Categoria
         const categoryEl =

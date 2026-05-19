@@ -39,7 +39,7 @@ export function createScrapeWorker(): Worker {
   const worker = new Worker<ScrapeJobData>(
     "scrape",
     async (job: Job<ScrapeJobData>) => {
-      const { city, searchQuery, maxResults } = job.data;
+      const { city, searchQuery, maxResults, niche } = job.data;
       log.info({ query: searchQuery, city }, "Scrape job iniciado");
 
       let newLeads = 0;
@@ -82,6 +82,7 @@ export function createScrapeWorker(): Worker {
         await pipelineQueue.add(`pipeline-${lead.id}`, {
           leadId: lead.id,
           placeId: lead.placeId,
+          sourceNiche: niche,
         });
 
         await betweenPagesDelay();

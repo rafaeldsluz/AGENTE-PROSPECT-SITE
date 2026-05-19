@@ -54,9 +54,12 @@ async function stageValidate(lead: Lead): Promise<
 
 async function stageEnrich(
   leadId: string,
-  business: BusinessValidated
+  business: BusinessValidated,
+  sourceNiche?: string
 ): Promise<{ ok: true; enriched: BusinessEnriched } | { ok: false; reason: string }> {
-  const nicheResult = await nicheClassifier.classify(business.name, business.category);
+  const nicheResult = sourceNiche
+    ? { niche: sourceNiche as import("../../../types/business.types.js").Niche, confidence: 0.97, reasoning: "Derivado da query de busca" }
+    : await nicheClassifier.classify(business.name, business.category);
   const enriched = scoringEngine.score(business, nicheResult.niche, nicheResult.confidence);
   await leadRepository.updateEnrichment(leadId, enriched);
 
@@ -91,7 +94,7 @@ export function createPipelineWorker(): Worker {
   const worker = new Worker<PipelineJobData>(
     "pipeline",
     async (job: Job<PipelineJobData>) => {
-      const { leadId } = job.data;
+      const { leadId, sourceNiche } = job.data;
       log.info({ leadId }, "Pipeline iniciado");
 
       const lead = await leadRepository.findById(leadId);
@@ -111,7 +114,7 @@ export function createPipelineWorker(): Worker {
       await job.updateProgress(30);
       log.debug({ name: lead.name }, "Stage 2/4 — classificação e score");
 
-      const enrichResult = await stageEnrich(leadId, validationResult.business);
+      const enrichResult = await stageEnrich(leadId, validationResult.business, sourceNiche);
       if (!enrichResult.ok) {
         log.info({ name: lead.name, reason: enrichResult.reason }, "Lead descartado");
         return { status: "disqualified", reason: enrichResult.reason };

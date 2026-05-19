@@ -8,6 +8,7 @@ export interface ScrapeJobData {
 export interface PipelineJobData {
   leadId: string;
   placeId: string;
+  sourceNiche?: string;
 }
 
 export interface DispatchJobData {
