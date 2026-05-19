@@ -273,7 +273,7 @@ export class GoogleMapsScraper {
         if (!name) return null;
 
         // Filtra textos genéricos da UI do Google Maps que aparecem em race condition
-        const GENERIC_NAMES = ["resultados", "results", "pesquisar", "search"];
+        const GENERIC_NAMES = ["resultados", "results", "pesquisar", "search", "patrocinado", "sponsored"];
         if (GENERIC_NAMES.includes(name.toLowerCase())) return null;
 
         // Categoria
