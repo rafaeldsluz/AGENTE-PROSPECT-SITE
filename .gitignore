@@ -1,6 +1,6 @@
 node_modules/
 dist/
-# .env rastreado intencionalmente para uso em outras máquinas
+.env
 output/
 migrations/
 *.log
