@@ -91,6 +91,7 @@ export function createScrapeWorker(): Worker {
     {
       connection: redisConnection,
       concurrency: 1,
+      lockDuration: 10 * 60 * 1_000, // 10 min — scraping pode demorar por query
     }
   );
 

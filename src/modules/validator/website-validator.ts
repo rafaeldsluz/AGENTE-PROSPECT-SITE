@@ -48,7 +48,7 @@ export class WebsiteValidator {
     // .com genéricos que pertencem a empresas diferentes em outros países
     if (!checks.some((c) => c.result)) {
       const candidates = generateDomainCandidates(business.name)
-        .filter((c) => c.endsWith(".com.br"));
+        .filter((c) => c.endsWith(".com.br") && !isSocialOrDirectoryDomain(c));
       for (const candidate of candidates.slice(0, 2)) {
         await randomDelay(300, 800);
         const active = await isDomainActive(candidate);

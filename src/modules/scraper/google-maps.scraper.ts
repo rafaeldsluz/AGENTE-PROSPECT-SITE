@@ -202,6 +202,9 @@ export class GoogleMapsScraper {
     city: string,
     onBusiness?: (b: BusinessRaw) => Promise<void>,
   ): Promise<BusinessRaw[]> {
+    const ctx = this.context;
+    if (!ctx) return [];
+
     const results: BusinessRaw[] = [];
     const sidebar = page.locator('[role="feed"]');
 
@@ -217,14 +220,12 @@ export class GoogleMapsScraper {
     const maxScrollAttempts = 15;
 
     while (results.length < maxResults && scrollAttempts < maxScrollAttempts) {
-      // Detecta fim real da lista antes de tentar coletar hrefs
       const endOfList = await page.$('span:has-text("Você chegou ao fim"), span:has-text("You\'ve reached the end")');
       if (endOfList) {
         log.debug("Fim da lista detectado pelo Google Maps");
         break;
       }
 
-      // Coleta todos os hrefs visíveis de uma vez (sem round-trip por link)
       const hrefs = await page.evaluate(() =>
         Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="/maps/place/"]'))
           .map((a) => a.getAttribute("href") ?? "")
@@ -233,8 +234,7 @@ export class GoogleMapsScraper {
 
       const newHrefs = hrefs.filter((h) => !seenHrefs.has(h));
       if (newHrefs.length === 0) {
-        // Pode ser loading — tenta mais um scroll antes de desistir
-        await sidebar.evaluate((el) => el.scrollBy(0, 300));
+        await sidebar.evaluate((el) => el.scrollBy(0, 300)).catch(() => {});
         await page.waitForSelector('[role="feed"] [aria-busy="true"]', { state: "hidden", timeout: 3_000 }).catch(() => {});
         scrollAttempts++;
         continue;
@@ -244,21 +244,15 @@ export class GoogleMapsScraper {
         if (results.length >= maxResults) break;
         seenHrefs.add(href);
 
+        // Abre o detalhe em nova aba — mantém a lista intacta para continuar o scroll
+        const fullHref = href.startsWith("http") ? href : `https://www.google.com.br${href}`;
+        const detailPage = await ctx.newPage();
         try {
-          const link = page.locator(`a[href="${href}"]`).first();
-          await link.click();
+          await detailPage.goto(fullHref, { waitUntil: "domcontentloaded", timeout: 15_000 });
+          await detailPage.waitForSelector('[role="main"] h1', { timeout: 8_000 });
+          await sleep(500);
 
-          // Aguarda a URL mudar para uma página de place específico (evita capturar o h1 "Resultados" da lista)
-          await page.waitForFunction(
-            () => window.location.href.includes("/maps/place/"),
-            { timeout: 8_000 }
-          ).catch(() => {}); // se não mudar, extractBusinessDetails vai retornar null pelo guard interno
-
-          await page.waitForSelector('[role="main"] h1', { timeout: 8_000 });
-          // Aguarda elementos async (telefone, fotos, reviews) carregarem
-          await sleep(700);
-
-          const business = await this.extractBusinessDetails(page, city);
+          const business = await this.extractBusinessDetails(detailPage, city);
           if (business) {
             if (onBusiness) {
               try {
@@ -270,21 +264,17 @@ export class GoogleMapsScraper {
             results.push(business);
             log.debug({ name: business.name }, "Business extraído");
           }
-
-          // Volta para a lista e aguarda o feed reaparecer
-          await page.goBack({ waitUntil: "domcontentloaded", timeout: 10_000 }).catch(() => {});
-          await page.waitForSelector('[role="feed"]', { timeout: 5_000 }).catch(() => {});
-
-          // Delay humano entre negócios: 1.5-4s
-          await randomDelay(1_500, 4_000);
         } catch (err) {
           log.debug({ href, error: String(err) }, "Erro ao extrair negócio");
+        } finally {
+          await detailPage.close().catch(() => {});
         }
+
+        await randomDelay(1_500, 3_000);
       }
 
       if (results.length < maxResults) {
-        await sidebar.evaluate((el) => el.scrollBy(0, 600));
-        // Aguarda spinner de carregamento sumir em vez de sleep fixo
+        await sidebar.evaluate((el) => el.scrollBy(0, 600)).catch(() => {});
         await page.waitForSelector('[role="feed"] [aria-busy="true"]', { state: "hidden", timeout: 3_000 }).catch(() => {});
         await randomDelay(600, 1_200);
         scrollAttempts++;
