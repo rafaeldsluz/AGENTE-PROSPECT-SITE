@@ -119,7 +119,8 @@ Responda APENAS em JSON com o formato: {"niche": "...", "confidence": 0.0-1.0, "
     });
 
     try {
-      const parsed = JSON.parse(text) as { niche: string; confidence: number; reasoning: string };
+      const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+      const parsed = JSON.parse(jsonText) as { niche: string; confidence: number; reasoning: string };
       const niche: Niche = VALID_NICHES.includes(parsed.niche as Niche)
         ? (parsed.niche as Niche)
         : "outros";

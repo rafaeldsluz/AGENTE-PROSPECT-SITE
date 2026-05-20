@@ -59,7 +59,7 @@ export class Orchestrator {
     log.info({ stats }, "Redis/BullMQ: conectado");
   }
 
-  private startWorkers(): void {
+  private startWorkers() {
     log.info("Iniciando workers...");
 
     const scrapeWorker = createScrapeWorker();

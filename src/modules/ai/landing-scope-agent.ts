@@ -110,7 +110,9 @@ REGRAS CRÍTICAS:
       messages: [{ role: "user", content: businessContext }],
     });
 
-    const parsed = JSON.parse(text) as LandingPageScope;
+    // Strip markdown code fences (DeepSeek sometimes wraps JSON in ```json ... ```)
+    const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    const parsed = JSON.parse(jsonText) as LandingPageScope;
 
     if (
       !parsed.heroHeadline ||
