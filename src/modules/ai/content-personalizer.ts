@@ -3,29 +3,36 @@ import type { BusinessEnriched } from "../../types/business.types.js";
 import type { TemplateData } from "../../types/template.types.js";
 import { formatBrazilianPhone } from "../../utils/phone.js";
 import { landingPageScopeAgent } from "./landing-scope-agent.js";
+import { analyzeBrandColors } from "./brand-analyzer.js";
 
 const log = createModuleLogger("ai:content-personalizer");
 
 const NICHE_COLORS: Record<string, { primaryColor: string; accentColor: string }> = {
-  oficina:     { primaryColor: "#1a1a2e", accentColor: "#f97316" },
-  clinica:     { primaryColor: "#0f172a", accentColor: "#0ea5e9" },
-  restaurante: { primaryColor: "#1c0a00", accentColor: "#dc2626" },
-  academia:    { primaryColor: "#09090b", accentColor: "#eab308" },
-  imoveis:     { primaryColor: "#0f2027", accentColor: "#10b981" },
-  estetica:    { primaryColor: "#1a0a0a", accentColor: "#ec4899" },
-  loja:        { primaryColor: "#0f0f23", accentColor: "#8b5cf6" },
-  servicos:    { primaryColor: "#0a1628", accentColor: "#3b82f6" },
-  advogado:    { primaryColor: "#0a0e1a", accentColor: "#c9a84c" },
-  comercio:    { primaryColor: "#0f1923", accentColor: "#f59e0b" },
-  outros:      { primaryColor: "#111827", accentColor: "#6366f1" },
+  advogado:   { primaryColor: "#0a0e1a", accentColor: "#c9a84c" },
+  clinica:    { primaryColor: "#0f172a", accentColor: "#0ea5e9" },
+  automoveis: { primaryColor: "#0d1117", accentColor: "#ef4444" },
+  imoveis:    { primaryColor: "#0f2027", accentColor: "#10b981" },
+  comercio:   { primaryColor: "#0f1923", accentColor: "#f59e0b" },
+  servicos:   { primaryColor: "#0a1628", accentColor: "#3b82f6" },
+  outros:     { primaryColor: "#111827", accentColor: "#6366f1" },
+  // legados — mantidos para leads antigos no banco
+  oficina:    { primaryColor: "#1a1a2e", accentColor: "#f97316" },
+  estetica:   { primaryColor: "#1a0a0a", accentColor: "#ec4899" },
 };
 
 export class ContentPersonalizer {
   async personalize(business: BusinessEnriched): Promise<TemplateData> {
     log.info({ name: business.name, niche: business.niche }, "Personalizando conteúdo");
 
-    const colors = NICHE_COLORS[business.niche] ?? NICHE_COLORS["outros"]!;
+    const nicheColors = NICHE_COLORS[business.niche] ?? NICHE_COLORS["outros"]!;
     const phone = business.whatsapp ?? business.phone ?? "";
+
+    // Tenta extrair paleta da marca real da empresa; usa padrão do nicho se falhar
+    const colors = await analyzeBrandColors(
+      business.logoUrl,
+      business.photos,
+      business.niche
+    ).catch(() => ({ ...nicheColors, source: "niche_default" as const }));
 
     try {
       const scope = await landingPageScopeAgent.generate(business);

@@ -13,6 +13,7 @@ interface ClassificationResult {
   reasoning: string;
 }
 
+/** Nichos ativos no pipeline. "servicos" e "outros" são disqualificados no pipeline.worker. */
 const VALID_NICHES: Niche[] = [
   "clinica", "imoveis", "servicos", "advogado", "comercio", "automoveis", "outros",
 ];
@@ -51,7 +52,34 @@ export class NicheClassifier {
           "advocacia", "advogado", "escritório jurídico", "jurídico", "direito", "oab",
           "trabalhista", "previdenciário", "tributário", "criminal", "cível",
         ],
-        confidence: 0.92,
+        confidence: 0.93,
+      },
+      {
+        niche: "automoveis",
+        keywords: [
+          "concessionária", "concessionaria", "automóveis", "automoveis",
+          "veículos", "veiculos", "multimarcas", "seminovos", "usados",
+          "carros", "motos", "caminhões", "caminhoes",
+          "fiat", "chevrolet", "volkswagen", "toyota", "honda", "ford",
+          "hyundai", "renault", "nissan", "jeep", "dodge", "bmw",
+          "mercedes", "audi", "volvo", "peugeot", "citroën", "mitsubishi",
+          "kia", "ram", "chery",
+          "oficina mecânica", "oficina", "mecânica automotiva", "mecânica",
+          "funilaria", "funileiro", "pintura automotiva",
+          "auto center", "autocenter", "autopeças", "auto peças",
+          "borracharia", "alinhamento", "balanceamento",
+          "estética automotiva", "higienização veicular", "lavagem automotiva",
+          "test drive", "financiamento de veículos", "revisão de veículos",
+        ],
+        confidence: 0.93,
+      },
+      {
+        niche: "imoveis",
+        keywords: [
+          "imobiliária", "imóveis", "corretor", "aluguel", "venda de imóv",
+          "lançamento", "incorporadora", "construtora", "loteamento", "real estate",
+        ],
+        confidence: 0.91,
       },
       {
         niche: "clinica",
@@ -60,16 +88,21 @@ export class NicheClassifier {
           "psicolog", "nutricion", "veterinár", "veterinário", "ortopedi",
           "cardiolog", "dermatolog", "ginecolog", "pediatr", "consultório",
           "laboratório", "fonoaudiolog", "terapia", "acupuntur",
+          "estética", "esteticista", "spa", "depilação", "micropigmentação",
+          "sobrancelha", "beleza clínica", "skincare", "botox", "preenchimento",
         ],
         confidence: 0.92,
       },
       {
-        niche: "imoveis",
+        niche: "comercio",
         keywords: [
-          "imobiliária", "imóveis", "corretor", "aluguel", "venda de imóv",
-          "lançamento", "incorporadora", "construtora", "loteamento", "real estate",
+          "ótica", "assistência técnica", "gráfica", "uniforme", "pet shop",
+          "lavanderia", "material de construção", "ferragem", "vidraçaria",
+          "papelaria", "floricultura", "brindes", "presentes",
+          "academia", "personal trainer", "pilates", "crossfit",
+          "restaurante", "lanchonete", "padaria", "pizzaria",
         ],
-        confidence: 0.90,
+        confidence: 0.86,
       },
       {
         niche: "servicos",
@@ -78,29 +111,7 @@ export class NicheClassifier {
           "limpeza", "higienização", "manutenção", "instalação",
           "contabilidade", "contador", "contábil",
         ],
-        confidence: 0.88,
-      },
-      {
-        niche: "automoveis",
-        keywords: [
-          "concessionária", "concessionaria", "automóveis", "automoveis",
-          "veículos", "veiculos", "multimarcas", "seminovos", "usados",
-          "carros", "motos", "caminhões", "caminhoes", "fiat", "chevrolet",
-          "volkswagen", "toyota", "honda", "ford", "hyundai", "renault",
-          "nissan", "jeep", "dodge", "bmw", "mercedes", "audi", "volvo",
-          "peugeot", "citroën", "mitsubishi", "kia", "ram", "chery",
-          "test drive", "financiamento de veículos", "revisão de veículos",
-        ],
-        confidence: 0.93,
-      },
-      {
-        niche: "comercio",
-        keywords: [
-          "ótica", "assistência técnica", "gráfica", "uniforme", "pet shop",
-          "lavanderia", "material de construção", "ferragem", "vidraçaria",
-          "papelaria", "floricultura", "brindes", "presentes",
-        ],
-        confidence: 0.88,
+        confidence: 0.85,
       },
     ];
 
@@ -120,7 +131,13 @@ export class NicheClassifier {
       max_tokens: 200,
       system: `Você é um classificador de nichos de negócios locais brasileiros.
 Classifique o negócio em exatamente um dos seguintes nichos:
-clinica, imoveis, servicos, advogado, comercio, automoveis, outros
+- advogado: escritórios de advocacia, jurídico, OAB
+- automoveis: concessionárias, multimarcas, oficinas, mecânicas, funilarias, auto center, estética automotiva, autopeças, borracharia
+- imoveis: imobiliárias, corretores, construtoras, loteamentos
+- clinica: clínicas médicas, dentistas, psicólogos, fisioterapeutas, veterinários, estética, spa, depilação
+- comercio: comércios locais, lojas, academias, restaurantes, padarias, pet shops
+- servicos: serviços técnicos, dedetizadoras, chaveiros, limpeza, contabilidade
+- outros: não se enquadra nos nichos acima
 
 Responda APENAS em JSON com o formato: {"niche": "...", "confidence": 0.0-1.0, "reasoning": "..."}`,
       messages: [

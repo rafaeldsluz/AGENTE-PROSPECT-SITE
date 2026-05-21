@@ -101,6 +101,34 @@ export async function isUrlAccessible(url: string): Promise<boolean> {
   }
 }
 
+const CMS_SIGNATURES = [
+  "wp-content", "wp-includes", "wordpress",
+  ".wixsite.com", "wix.com/", "wixstatic.com",
+  "webflow.io", ".webflow.com",
+  "cdn.shopify", "myshopify.com",
+  "nuvemshop.com.br", "lojaintegrada.com.br",
+  "carrd.co", "framer.com",
+  "notion.site", "sites.google.com",
+  "squarespace.com", "godaddy.com/website-builder",
+] as const;
+
+export async function detectCMS(url: string): Promise<boolean> {
+  try {
+    const fullUrl = url.startsWith("http") ? url : `https://${url}`;
+    const response = await axios.get<string>(fullUrl, {
+      timeout: 6_000,
+      maxRedirects: 5,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ProspectorBot/1.0)" },
+      validateStatus: (s) => s === 200,
+      responseType: "text",
+    });
+    const html = (response.data ?? "").slice(0, 8_192).toLowerCase();
+    return CMS_SIGNATURES.some((sig) => html.includes(sig.toLowerCase()));
+  } catch {
+    return false;
+  }
+}
+
 // Padrões em HTML que indicam domínio estacionado ou à venda
 const PARKING_SIGNATURES = [
   "domain for sale", "buy this domain", "domain parking", "parked by",
@@ -128,11 +156,19 @@ export async function isParkedPage(url: string): Promise<boolean> {
   }
 }
 
-export function generateDomainCandidates(companyName: string): string[] {
+const NICHE_DOMAIN_SUFFIXES: Record<string, string[]> = {
+  advogado:   ["adv", "advocacia", "advogados", "juridico", "law"],
+  clinica:    ["clinica", "saude", "consultorio", "med", "odonto"],
+  automoveis: ["auto", "veiculos", "motors", "automotiva", "cars"],
+  imoveis:    ["imoveis", "imobiliaria", "corretor", "real"],
+  comercio:   ["loja", "store", "shop", "comercio"],
+};
+
+export function generateDomainCandidates(companyName: string, niche?: string): string[] {
   const base = companyName
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")   // Remove acentos
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9\s]/g, "")
     .trim()
     .replace(/\s+/g, "");
@@ -148,27 +184,31 @@ export function generateDomainCandidates(companyName: string): string[] {
 
   const candidates = new Set<string>();
 
-  // Domínio direto
   if (base.length >= 3) {
     candidates.add(`${base}.com.br`);
     candidates.add(`${base}.com`);
     candidates.add(`${base}.net.br`);
   }
 
-  // Primeiras 2 palavras
   if (words.length >= 2) {
     const twoWords = words.slice(0, 2).join("");
     candidates.add(`${twoWords}.com.br`);
     candidates.add(`${twoWords}.com`);
   }
 
-  // Primeira palavra
   const firstWord = words[0];
   if (firstWord && firstWord.length >= 4) {
     candidates.add(`${firstWord}.com.br`);
     candidates.add(`${firstWord}.com`);
   }
 
-  log.debug({ companyName, candidates: [...candidates] }, "Domínios candidatos gerados");
+  // Candidatos com sufixo de nicho
+  const nicheSuffixes = niche ? (NICHE_DOMAIN_SUFFIXES[niche] ?? []) : [];
+  for (const suffix of nicheSuffixes) {
+    if (base.length >= 3) candidates.add(`${base}${suffix}.com.br`);
+    if (firstWord && firstWord.length >= 4) candidates.add(`${firstWord}${suffix}.com.br`);
+  }
+
+  log.debug({ companyName, niche, candidateCount: candidates.size }, "Domínios candidatos gerados");
   return [...candidates];
 }

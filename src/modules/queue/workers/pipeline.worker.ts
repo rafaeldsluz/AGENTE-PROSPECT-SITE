@@ -55,6 +55,9 @@ async function stageValidate(lead: Lead): Promise<
   return { ok: true, business: { ...businessRaw, validation } };
 }
 
+/** Nichos que não têm template nem potencial comercial no pipeline atual */
+const DISQUALIFIED_NICHES = new Set(["servicos", "outros"]);
+
 async function stageEnrich(
   leadId: string,
   business: BusinessValidated,
@@ -63,6 +66,19 @@ async function stageEnrich(
   const nicheResult = sourceNiche
     ? { niche: sourceNiche as import("../../../types/business.types.js").Niche, confidence: 0.97, reasoning: "Derivado da query de busca" }
     : await nicheClassifier.classify(business.name, business.category);
+
+  // Descarte antecipado por nicho — antes de calcular score e gerar página
+  if (DISQUALIFIED_NICHES.has(nicheResult.niche)) {
+    await leadRepository.updateEnrichment(leadId, {
+      ...business,
+      niche: nicheResult.niche,
+      nicheConfidence: nicheResult.confidence,
+      score: 0,
+      scoreBreakdown: { hasWhatsApp: 0, reviewCount: 0, rating: 0, photoCount: 0, hasInstagram: 0, hasLogo: 0, categoryRelevance: 0, instagramOnly: 0 },
+    }, "disqualified");
+    return { ok: false, reason: `nicho fora do escopo: ${nicheResult.niche}` };
+  }
+
   const enriched = scoringEngine.score(business, nicheResult.niche, nicheResult.confidence);
 
   const targetPhone = enriched.whatsapp ?? enriched.phone;

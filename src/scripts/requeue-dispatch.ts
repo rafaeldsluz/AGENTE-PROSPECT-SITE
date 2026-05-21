@@ -64,6 +64,7 @@ async function main() {
       validation: {
         hasOwnWebsite: false,
         websiteUrl: null,
+        noWebsiteScore: 90,
         confidence: 0.9,
         reason: "skip",
         checkedAt: new Date(),

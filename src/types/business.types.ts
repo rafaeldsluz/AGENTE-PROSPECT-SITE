@@ -39,6 +39,9 @@ export interface BusinessRaw {
 export interface WebsiteValidationResult {
   hasOwnWebsite: boolean;
   websiteUrl: string | null;
+  /** 0-100: probabilidade de ausência de site (≥70 = aprovado no pipeline) */
+  noWebsiteScore: number;
+  /** noWebsiteScore / 100 — mantido para compatibilidade com repositório */
   confidence: number;
   reason: string;
   checkedAt: Date;

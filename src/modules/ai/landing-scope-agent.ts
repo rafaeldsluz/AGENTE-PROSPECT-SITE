@@ -9,21 +9,23 @@ import type { ServiceItem } from "../../types/template.types.js";
 const log = createModuleLogger("ai:landing-scope-agent");
 
 const NICHE_LABELS: Record<string, string> = {
-  clinica: "Clínica / Consultório de Saúde",
-  imoveis: "Imobiliária / Corretagem de Imóveis",
-  servicos: "Prestação de Serviços",
-  advogado: "Escritório de Advocacia",
-  comercio: "Comércio Local",
-  outros: "Empresa Local",
+  advogado:   "Escritório de Advocacia",
+  clinica:    "Clínica / Consultório de Saúde",
+  automoveis: "Empresa do Setor Automotivo",
+  imoveis:    "Imobiliária / Corretagem de Imóveis",
+  comercio:   "Comércio Local",
+  servicos:   "Prestação de Serviços",
+  outros:     "Empresa Local",
 };
 
 const NICHE_TONE: Record<string, string> = {
-  clinica: "acolhedor e profissional, foco em cuidado e bem-estar",
-  imoveis: "seguro e aspiracional, foco em realização e patrimônio",
-  servicos: "competente e ágil, foco em solução e praticidade",
-  advogado: "sério e confiável, foco em defesa e tranquilidade",
-  comercio: "próximo e confiável, foco em variedade, qualidade e atendimento local",
-  outros: "profissional e próximo, foco em atendimento e resultado",
+  advogado:   "sério, confiável e institucional, foco em segurança jurídica e defesa dos direitos",
+  clinica:    "acolhedor e profissional, foco em cuidado, bem-estar e confiança",
+  automoveis: "forte, moderno e tecnológico, foco em performance, qualidade e agilidade no atendimento",
+  imoveis:    "seguro e aspiracional, foco em realização, patrimônio e investimento",
+  comercio:   "próximo e confiável, foco em variedade, qualidade e atendimento personalizado",
+  servicos:   "competente e ágil, foco em solução rápida e praticidade",
+  outros:     "profissional e próximo, foco em atendimento e resultado",
 };
 
 export interface LandingPageScope {
