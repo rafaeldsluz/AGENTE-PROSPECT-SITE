@@ -14,7 +14,7 @@ interface ClassificationResult {
 }
 
 const VALID_NICHES: Niche[] = [
-  "clinica", "imoveis", "servicos", "advogado", "comercio", "outros",
+  "clinica", "imoveis", "servicos", "advogado", "comercio", "automoveis", "outros",
 ];
 
 export class NicheClassifier {
@@ -81,6 +81,19 @@ export class NicheClassifier {
         confidence: 0.88,
       },
       {
+        niche: "automoveis",
+        keywords: [
+          "concessionária", "concessionaria", "automóveis", "automoveis",
+          "veículos", "veiculos", "multimarcas", "seminovos", "usados",
+          "carros", "motos", "caminhões", "caminhoes", "fiat", "chevrolet",
+          "volkswagen", "toyota", "honda", "ford", "hyundai", "renault",
+          "nissan", "jeep", "dodge", "bmw", "mercedes", "audi", "volvo",
+          "peugeot", "citroën", "mitsubishi", "kia", "ram", "chery",
+          "test drive", "financiamento de veículos", "revisão de veículos",
+        ],
+        confidence: 0.93,
+      },
+      {
         niche: "comercio",
         keywords: [
           "ótica", "assistência técnica", "gráfica", "uniforme", "pet shop",
@@ -107,7 +120,7 @@ export class NicheClassifier {
       max_tokens: 200,
       system: `Você é um classificador de nichos de negócios locais brasileiros.
 Classifique o negócio em exatamente um dos seguintes nichos:
-clinica, imoveis, servicos, advogado, comercio, outros
+clinica, imoveis, servicos, advogado, comercio, automoveis, outros
 
 Responda APENAS em JSON com o formato: {"niche": "...", "confidence": 0.0-1.0, "reasoning": "..."}`,
       messages: [

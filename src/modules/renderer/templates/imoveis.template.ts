@@ -5,13 +5,26 @@ export function renderImoveisTemplate(data: TemplateData): string {
 
   const services = data.services
     .map(
-      (s) => `
-      <div class="flex items-start gap-5 p-6 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-        <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">${s.icon}</div>
-        <div>
-          <h3 class="font-bold text-slate-800 text-lg mb-1">${s.name}</h3>
-          <p class="text-slate-500 text-sm">${s.description}</p>
+      (s, i) => `
+      <div class="svc-card">
+        <div class="svc-num">0${i + 1}</div>
+        <div class="svc-icon">${s.icon}</div>
+        <h3 class="svc-title">${s.name}</h3>
+        <p class="svc-desc">${s.description}</p>
+      </div>`
+    )
+    .join("");
+
+  const differentials = data.differentials
+    .map(
+      (d) => `
+      <div class="diff-item">
+        <div class="diff-check">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 6L4.5 8.5L10 3" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </div>
+        <span class="diff-text">${d}</span>
       </div>`
     )
     .join("");
@@ -21,102 +34,379 @@ export function renderImoveisTemplate(data: TemplateData): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${data.companyName}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <title>${data.companyName} — Imóveis em ${data.city}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
-    h1, h2 { font-family: 'Cormorant Garamond', serif; }
-    body { font-family: 'Inter', sans-serif; }
-    .hero-bg { background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #0f2027 100%); }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink: #0a0d0e;
+      --ink-2: #111618;
+      --teal: #0a7c57;
+      --teal-light: #13a874;
+      --gold: #c8955f;
+      --sand: #f5f0e8;
+      --text: #1a2027;
+      --muted: #6b7580;
+      --border: rgba(10,124,87,0.15);
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'DM Sans', system-ui, sans-serif; color: var(--text); background: var(--sand); }
+    h1, h2, h3, .serif { font-family: 'Playfair Display', Georgia, serif; }
+    a { text-decoration: none; color: inherit; }
+    img { display: block; max-width: 100%; }
+
+    /* ── NAV ──────────────────────────────────────────── */
+    .nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,13,14,0.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(200,149,95,0.15);
+    }
+    .nav-inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 68px;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 12px; }
+    .nav-logo { height: 36px; width: auto; border-radius: 4px; }
+    .nav-name { font-family: 'Playfair Display', serif; font-size: 16px; color: #fff; font-weight: 700; }
+    .nav-sub { font-size: 10px; color: var(--gold); font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 1px; }
+    .nav-cta {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--teal); color: #fff; font-weight: 600; font-size: 13px;
+      padding: 10px 22px; border-radius: 6px; transition: background 0.2s;
+    }
+    .nav-cta:hover { background: var(--teal-light); }
+    .nav-phone { display: flex; align-items: center; gap: 10px; }
+    .nav-tel { font-size: 12px; color: rgba(255,255,255,0.5); }
+    .nav-tel strong { color: rgba(255,255,255,0.85); font-weight: 500; }
+
+    /* ── HERO ─────────────────────────────────────────── */
+    .hero {
+      position: relative; min-height: 100vh; display: flex; align-items: center;
+      overflow: hidden;
+    }
+    .hero-bg {
+      position: absolute; inset: 0;
+      background-image: url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1600&q=85&auto=format&fit=crop');
+      background-size: cover; background-position: center 30%;
+    }
+    .hero-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(105deg, rgba(10,13,14,0.88) 0%, rgba(10,13,14,0.72) 45%, rgba(10,13,14,0.35) 100%);
+    }
+    .hero-content {
+      position: relative; z-index: 2;
+      max-width: 1200px; margin: 0 auto; padding: 120px 2rem 80px;
+    }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid rgba(200,149,95,0.35); border-radius: 2px;
+      padding: 6px 14px; margin-bottom: 28px;
+      color: var(--gold); font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase;
+    }
+    .hero-title {
+      font-size: clamp(3rem, 7vw, 5.5rem); line-height: 1.05;
+      color: #fff; max-width: 680px; margin-bottom: 24px;
+    }
+    .hero-title em { color: var(--gold); font-style: italic; }
+    .hero-sub {
+      font-size: 18px; color: rgba(255,255,255,0.6); max-width: 480px;
+      line-height: 1.7; margin-bottom: 44px;
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: var(--teal); color: #fff; font-weight: 700; font-size: 15px;
+      padding: 16px 32px; border-radius: 6px; transition: all 0.2s;
+      box-shadow: 0 8px 28px rgba(10,124,87,0.4);
+    }
+    .btn-primary:hover { background: var(--teal-light); transform: translateY(-1px); }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid rgba(255,255,255,0.25); color: rgba(255,255,255,0.8);
+      font-weight: 500; font-size: 14px; padding: 14px 26px; border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .btn-ghost:hover { border-color: rgba(255,255,255,0.5); color: #fff; }
+    .hero-rating {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.08); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+      padding: 12px 18px; margin-top: 50px; width: fit-content;
+    }
+    .hero-stars { color: #f5c542; font-size: 14px; }
+    .hero-rating-text { font-size: 12px; color: rgba(255,255,255,0.6); }
+    .hero-rating-text strong { color: #fff; font-size: 15px; }
+
+    /* ── PROPERTY STRIP ──────────────────────────────── */
+    .prop-strip {
+      position: relative; height: 360px; overflow: hidden;
+    }
+    .prop-strip-img {
+      width: 100%; height: 100%; object-fit: cover;
+      background-image: url('https://images.unsplash.com/photo-1600210492493-0946911123ea?w=1600&q=85&auto=format&fit=crop');
+      background-size: cover; background-position: center;
+    }
+    .prop-strip-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to right, rgba(10,13,14,0.8) 0%, rgba(10,13,14,0.3) 50%, rgba(10,13,14,0.7) 100%);
+      display: flex; align-items: center; padding: 0 2rem;
+    }
+    .prop-strip-inner {
+      max-width: 1200px; margin: 0 auto; width: 100%;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 32px;
+    }
+    .prop-strip-headline {
+      font-family: 'Playfair Display', serif; font-size: clamp(1.8rem, 4vw, 2.8rem);
+      color: #fff; max-width: 440px; line-height: 1.2;
+    }
+    .prop-strip-headline span { color: var(--gold); }
+    .prop-stats { display: flex; gap: 40px; }
+    .prop-stat-num { font-family: 'Playfair Display', serif; font-size: 3rem; font-weight: 800; color: #fff; line-height: 1; }
+    .prop-stat-label { font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; }
+
+    /* ── SERVICES ────────────────────────────────────── */
+    .section { padding: 96px 2rem; }
+    .section-inner { max-width: 1200px; margin: 0 auto; }
+    .section-label {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--teal); margin-bottom: 12px;
+    }
+    .section-title { font-size: clamp(2rem, 4vw, 2.8rem); color: var(--text); margin-bottom: 48px; line-height: 1.2; }
+    .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px; }
+    .svc-card {
+      background: #fff; padding: 36px 28px; position: relative; overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .svc-card:hover { box-shadow: 0 12px 40px rgba(10,124,87,0.1); }
+    .svc-card::before { content: ''; position: absolute; inset: 0 0 0 0; border-left: 3px solid transparent; transition: border-color 0.2s; }
+    .svc-card:hover::before { border-color: var(--teal); }
+    .svc-num { font-size: 10px; font-weight: 700; color: var(--gold); letter-spacing: 0.2em; margin-bottom: 20px; }
+    .svc-icon { font-size: 2rem; margin-bottom: 16px; }
+    .svc-title { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--text); margin-bottom: 10px; }
+    .svc-desc { font-size: 14px; color: var(--muted); line-height: 1.65; }
+
+    /* ── DIFFERENTIALS ───────────────────────────────── */
+    .diff-section { background: var(--ink); padding: 96px 2rem; position: relative; overflow: hidden; }
+    .diff-section::before {
+      content: ''; position: absolute; inset: 0;
+      background-image: url('https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=1200&q=80&auto=format&fit=crop');
+      background-size: cover; background-position: center;
+      opacity: 0.12;
+    }
+    .diff-inner { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
+    .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+    .diff-headline { font-family: 'Playfair Display', serif; font-size: clamp(2rem, 4vw, 3rem); color: #fff; line-height: 1.2; margin-bottom: 12px; }
+    .diff-headline em { color: var(--gold); font-style: italic; }
+    .diff-sub { font-size: 16px; color: rgba(255,255,255,0.5); line-height: 1.6; margin-bottom: 40px; }
+    .diff-list { display: flex; flex-direction: column; gap: 16px; }
+    .diff-item { display: flex; align-items: flex-start; gap: 14px; }
+    .diff-check { width: 22px; height: 22px; border-radius: 50%; background: var(--teal); flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; }
+    .diff-text { font-size: 15px; color: rgba(255,255,255,0.8); line-height: 1.5; }
+    .diff-cta-wrap { display: flex; flex-direction: column; gap: 20px; }
+    .diff-city-card {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(200,149,95,0.2);
+      border-radius: 10px; padding: 24px;
+    }
+    .diff-city-label { font-size: 11px; color: var(--gold); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+    .diff-city-name { font-family: 'Playfair Display', serif; font-size: 2rem; color: #fff; }
+    .diff-city-sub { font-size: 13px; color: rgba(255,255,255,0.45); margin-top: 4px; }
+    .diff-cta {
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    /* ── STATS ───────────────────────────────────────── */
+    .stats-section {
+      background: var(--teal); padding: 64px 2rem;
+    }
+    .stats-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; text-align: center; }
+    .stat-num { font-family: 'Playfair Display', serif; font-size: 3.5rem; font-weight: 800; color: #fff; line-height: 1; }
+    .stat-label { font-size: 12px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 8px; }
+
+    /* ── CTA ─────────────────────────────────────────── */
+    .cta-section { background: var(--sand); padding: 96px 2rem; }
+    .cta-inner { max-width: 680px; margin: 0 auto; text-align: center; }
+    .cta-title { font-size: clamp(2rem, 4.5vw, 3.2rem); color: var(--text); margin-bottom: 16px; line-height: 1.2; }
+    .cta-title em { color: var(--teal); font-style: italic; }
+    .cta-sub { font-size: 17px; color: var(--muted); line-height: 1.65; margin-bottom: 40px; }
+    .cta-btn {
+      display: inline-flex; align-items: center; gap: 12px;
+      background: var(--ink); color: #fff; font-weight: 700; font-size: 16px;
+      padding: 20px 44px; border-radius: 6px; transition: all 0.2s;
+      box-shadow: 0 12px 40px rgba(10,13,14,0.25);
+    }
+    .cta-btn:hover { background: var(--teal); box-shadow: 0 12px 40px rgba(10,124,87,0.35); transform: translateY(-2px); }
+    .cta-note { font-size: 12px; color: var(--muted); margin-top: 16px; }
+
+    /* ── FOOTER ──────────────────────────────────────── */
+    footer { background: var(--ink); padding: 36px 2rem; }
+    .footer-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+    .footer-brand { font-family: 'Playfair Display', serif; font-size: 18px; color: #fff; }
+    .footer-info { font-size: 13px; color: rgba(255,255,255,0.35); }
+
+    @media (max-width: 768px) {
+      .diff-grid { grid-template-columns: 1fr; gap: 40px; }
+      .stats-inner { grid-template-columns: repeat(2, 1fr); }
+      .svc-grid { grid-template-columns: 1fr; }
+      .prop-stats { gap: 24px; }
+      .nav-phone { display: none; }
+    }
   </style>
 </head>
-<body class="bg-slate-50">
+<body>
 
   <!-- NAV -->
-  <nav class="bg-white shadow-sm border-b border-slate-100 sticky top-0 z-50">
-    <div class="container mx-auto px-6 py-4 flex justify-between items-center">
-      <div class="flex items-center gap-3">
-        ${data.logoUrl ? `<img src="${data.logoUrl}" alt="Logo" class="h-10 w-auto object-contain" />` : ""}
+  <nav class="nav">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        ${data.logoUrl ? `<img src="${data.logoUrl}" alt="Logo" class="nav-logo" />` : ""}
         <div>
-          <span class="font-semibold text-slate-800">${data.companyName}</span>
-          <div class="text-xs text-emerald-600 font-medium">CRECI Registrada</div>
+          <div class="nav-name">${data.companyName}</div>
+          <div class="nav-sub">Imóveis · ${data.city}</div>
         </div>
       </div>
-      <a href="${whatsappUrl}" target="_blank"
-         class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-5 py-2.5 rounded-xl transition-all text-sm">
-        Falar com Corretor
-      </a>
+      <div class="nav-phone">
+        <div class="nav-tel">Fale com um corretor<br><strong>${data.phone ?? data.whatsapp ?? ""}</strong></div>
+        <a href="${whatsappUrl}" target="_blank" class="nav-cta">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>
+          WhatsApp
+        </a>
+      </div>
     </div>
   </nav>
 
   <!-- HERO -->
-  <section class="hero-bg py-32 text-white">
-    <div class="container mx-auto px-6">
-      <div class="max-w-3xl">
-        <div class="inline-flex items-center gap-2 border border-emerald-400/30 bg-emerald-400/10 rounded-full px-4 py-2 text-emerald-300 text-sm mb-8">
-          🏠 Imóveis em ${data.city}
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <div class="hero-eyebrow">🏠 ${data.city} — Imóveis Exclusivos</div>
+      <h1 class="hero-title">${data.heroHeadline}</h1>
+      <p class="hero-sub">${data.heroSubtitle}</p>
+      <div class="hero-actions">
+        <a href="${whatsappUrl}" target="_blank" class="btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>
+          ${data.ctaText}
+        </a>
+        <a href="tel:${(data.phone ?? data.whatsapp ?? "").replace(/\D/g, "")}" class="btn-ghost">
+          Ligar agora →
+        </a>
+      </div>
+      <div class="hero-rating">
+        <span class="hero-stars">★★★★★</span>
+        <div class="hero-rating-text">
+          <strong>${data.rating?.toFixed(1) ?? "5.0"}</strong> — ${data.reviewCount ?? 0} avaliações no Google
         </div>
-        <h1 class="text-6xl md:text-7xl leading-none mb-6">${data.heroHeadline}</h1>
-        <p class="text-slate-300 text-xl mb-10 leading-relaxed max-w-xl">${data.heroSubtitle}</p>
-        <div class="flex flex-wrap gap-4">
-          <a href="${whatsappUrl}" target="_blank"
-             class="inline-flex items-center gap-3 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-2xl transition-all shadow-lg">
-            <svg class="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 17.36c-.833 1.246-2.064 2.1-3.468 2.426a9.9 9.9 0 01-2.426.307c-1.73 0-3.423-.447-4.916-1.306L2 20l1.22-5.03A9.868 9.868 0 012.1 12C2.1 6.545 6.545 2.1 12 2.1S21.9 6.545 21.9 12a9.87 9.87 0 01-4.006 5.36z"/></svg>
-            ${data.ctaText}
-          </a>
-          <div class="flex items-center gap-3 bg-white/10 backdrop-blur border border-white/20 px-6 py-4 rounded-2xl">
-            <span class="text-2xl font-bold">${data.rating?.toFixed(1) ?? "5.0"}</span>
-            <div>
-              <div class="text-yellow-400 text-sm">⭐⭐⭐⭐⭐</div>
-              <div class="text-slate-300 text-xs">${data.reviewCount ?? 0} avaliações</div>
-            </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROPERTY STRIP -->
+  <div class="prop-strip">
+    <div class="prop-strip-img" style="background-image:url('https://images.unsplash.com/photo-1600210492493-0946911123ea?w=1600&q=85&auto=format&fit=crop');background-size:cover;background-position:center;height:100%;width:100%;position:absolute;inset:0"></div>
+    <div class="prop-strip-overlay">
+      <div class="prop-strip-inner">
+        <h2 class="prop-strip-headline serif">
+          Imóveis que <span>transformam</span> vidas em ${data.city}
+        </h2>
+        <div class="prop-stats">
+          <div>
+            <div class="prop-stat-num">${data.reviewCount ?? "200"}+</div>
+            <div class="prop-stat-label">Clientes atendidos</div>
+          </div>
+          <div>
+            <div class="prop-stat-num">${data.rating?.toFixed(1) ?? "4.9"}</div>
+            <div class="prop-stat-label">Nota no Google</div>
+          </div>
+          <div>
+            <div class="prop-stat-num">10+</div>
+            <div class="prop-stat-label">Anos no mercado</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SERVICES -->
+  <section class="section" style="background:#fff">
+    <div class="section-inner">
+      <div class="section-label">Como trabalhamos</div>
+      <h2 class="section-title serif">Nossos serviços imobiliários</h2>
+      <div class="svc-grid">${services}</div>
+    </div>
+  </section>
+
+  <!-- DIFFERENTIALS -->
+  <section class="diff-section">
+    <div class="diff-inner">
+      <div class="diff-grid">
+        <div>
+          <h2 class="diff-headline serif">Por que escolher a <em>${data.companyName}?</em></h2>
+          <p class="diff-sub">Somos especialistas no mercado imobiliário de ${data.city} com atendimento personalizado e resultados comprovados.</p>
+          <div class="diff-list">${differentials}</div>
+        </div>
+        <div class="diff-cta-wrap">
+          <div class="diff-city-card">
+            <div class="diff-city-label">Atuação principal</div>
+            <div class="diff-city-name">${data.city}</div>
+            <div class="diff-city-sub">${data.address}</div>
+          </div>
+          <div class="diff-cta">
+            <a href="${whatsappUrl}" target="_blank" class="btn-primary" style="justify-content:center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>
+              Falar com Corretor
+            </a>
+            <a href="tel:${(data.phone ?? data.whatsapp ?? "").replace(/\D/g, "")}" class="btn-ghost" style="justify-content:center">
+              ${data.phone ?? data.whatsapp ?? ""}
+            </a>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- SERVIÇOS -->
-  <section class="py-24 bg-white">
-    <div class="container mx-auto px-6">
-      <div class="text-center mb-16">
-        <span class="text-emerald-600 font-semibold text-sm uppercase tracking-widest">Como podemos ajudar</span>
-        <h2 class="text-4xl font-black mt-2 text-slate-800">Serviços Imobiliários</h2>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
-        ${services}
-      </div>
-    </div>
-  </section>
-
   <!-- STATS -->
-  <section class="py-20 bg-emerald-800 text-white">
-    <div class="container mx-auto px-6">
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-        <div><div class="text-5xl font-bold mb-2">${data.reviewCount ?? "100"}+</div><div class="text-emerald-200">Clientes Satisfeitos</div></div>
-        <div><div class="text-5xl font-bold mb-2">98%</div><div class="text-emerald-200">Taxa de Satisfação</div></div>
-        <div><div class="text-5xl font-bold mb-2">${data.rating?.toFixed(1) ?? "4.9"}</div><div class="text-emerald-200">Nota no Google</div></div>
-        <div><div class="text-5xl font-bold mb-2">10+</div><div class="text-emerald-200">Anos de Mercado</div></div>
+  <section class="stats-section">
+    <div class="stats-inner">
+      <div>
+        <div class="stat-num">${data.reviewCount ?? "200"}+</div>
+        <div class="stat-label">Clientes atendidos</div>
+      </div>
+      <div>
+        <div class="stat-num">${data.rating?.toFixed(1) ?? "4.9"}</div>
+        <div class="stat-label">Avaliação Google</div>
+      </div>
+      <div>
+        <div class="stat-num">98%</div>
+        <div class="stat-label">Satisfação</div>
+      </div>
+      <div>
+        <div class="stat-num">10+</div>
+        <div class="stat-label">Anos de mercado</div>
       </div>
     </div>
   </section>
 
   <!-- CTA -->
-  <section class="py-20 bg-slate-50">
-    <div class="container mx-auto px-6 text-center">
-      <h2 class="text-4xl font-black text-slate-800 mb-4">Encontre o imóvel ideal</h2>
-      <p class="text-slate-500 text-xl mb-8">Fale agora com nossos corretores especializados.</p>
-      <a href="${whatsappUrl}" target="_blank"
-         class="inline-flex items-center gap-3 bg-emerald-600 text-white font-bold text-xl px-10 py-5 rounded-2xl hover:bg-emerald-500 transition-all shadow-xl">
-        Falar com Corretor
+  <section class="cta-section">
+    <div class="cta-inner">
+      <h2 class="cta-title serif">Encontre o <em>imóvel ideal</em> para você</h2>
+      <p class="cta-sub">Nossos corretores especializados em ${data.city} vão te ajudar a encontrar o imóvel perfeito — seja para morar ou investir.</p>
+      <a href="${whatsappUrl}" target="_blank" class="cta-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>
+        Falar com Corretor no WhatsApp
       </a>
+      <p class="cta-note">Resposta em minutos · Atendimento personalizado</p>
     </div>
   </section>
 
-  <footer class="bg-slate-900 text-slate-400 py-8">
-    <div class="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
-      <p class="text-white font-semibold">${data.companyName} · ${data.city}</p>
-      <p class="text-sm">${data.address}</p>
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">${data.companyName}</div>
+      <div class="footer-info">${data.address} · ${data.city}</div>
     </div>
   </footer>
 

@@ -22,6 +22,7 @@ export const nicheEnum = pgEnum("niche", [
   "servicos",
   "advogado",
   "comercio",
+  "automoveis",
   "outros",
 ]);
 
@@ -74,6 +75,7 @@ export const leads = pgTable(
     status: leadStatusEnum("status").default("scraped").notNull(),
     pagePath: text("page_path"),
     screenshotPath: text("screenshot_path"),
+    pageUrl: text("page_url"),
 
     // Timestamps
     scrapedAt: timestamp("scraped_at").defaultNow().notNull(),
@@ -112,7 +114,21 @@ export const dispatches = pgTable(
   })
 );
 
+export const messageTemplates = pgTable(
+  "message_templates",
+  {
+    id: text("id").primaryKey(),
+    niche: text("niche").notNull(),
+    template: text("template").notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    nicheUniqueIdx: uniqueIndex("msg_templates_niche_idx").on(t.niche),
+  })
+);
+
 export type Lead = typeof leads.$inferSelect;
 export type NewLead = typeof leads.$inferInsert;
 export type Dispatch = typeof dispatches.$inferSelect;
 export type NewDispatch = typeof dispatches.$inferInsert;
+export type MessageTemplate = typeof messageTemplates.$inferSelect;

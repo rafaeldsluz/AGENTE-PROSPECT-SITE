@@ -9,6 +9,7 @@ import { contentPersonalizer } from "../../ai/content-personalizer.js";
 import { messageGenerator } from "../../ai/message-generator.js";
 import { renderScopePage } from "../../renderer/scope-renderer.js";
 import { screenshotGenerator } from "../../screenshot/screenshot-generator.js";
+import { uploadPageToR2 } from "../../storage/r2-uploader.js";
 import { config } from "../../../config/index.js";
 import { isWithinDispatchWindow } from "../../dispatch-schedule.js";
 import type { PipelineJobData, DispatchJobData } from "../../../types/queue.types.js";
@@ -80,15 +81,26 @@ async function stageEnrich(
   return { ok: true, enriched };
 }
 
-async function stageRenderAndCapture(leadId: string, enriched: BusinessEnriched): Promise<string> {
+async function stageRenderAndCapture(
+  leadId: string,
+  enriched: BusinessEnriched
+): Promise<{ screenshotPath: string; pageUrl: string | null }> {
   const templateData = await contentPersonalizer.personalize(enriched);
   const scopeFilePath = await renderScopePage(templateData);
   await leadRepository.updatePagePath(leadId, scopeFilePath);
 
-  const screenshot = await screenshotGenerator.capture(scopeFilePath, enriched.name);
+  const [screenshot, pageUrl] = await Promise.all([
+    screenshotGenerator.capture(scopeFilePath, enriched.name),
+    uploadPageToR2(scopeFilePath, enriched.name, leadId),
+  ]);
+
   await leadRepository.updateScreenshotPath(leadId, screenshot.filePath);
 
-  return screenshot.filePath;
+  if (pageUrl) {
+    await leadRepository.updatePageUrl(leadId, pageUrl);
+  }
+
+  return { screenshotPath: screenshot.filePath, pageUrl };
 }
 
 // ── Worker ───────────────────────────────────────────────────────────────────
@@ -129,7 +141,7 @@ export function createPipelineWorker(): Worker {
       await job.updateProgress(55);
       log.debug({ name: lead.name }, "Stage 3/4 — renderização e screenshot");
 
-      const mockupPath = await stageRenderAndCapture(leadId, enriched);
+      const { screenshotPath: mockupPath, pageUrl } = await stageRenderAndCapture(leadId, enriched);
 
       // ── Stage 4: Generate message + enqueue dispatch ─────────────────────
       await job.updateProgress(85);
@@ -144,6 +156,7 @@ export function createPipelineWorker(): Worker {
         companyName: lead.name,
         screenshotPath: mockupPath,
         message,
+        ...(pageUrl ? { pageUrl } : {}),
       };
 
       // Durante horário comercial: delay curto (30–90s) para parecer humano.

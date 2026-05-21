@@ -11,7 +11,7 @@ export function createDispatchWorker(): Worker {
   const worker = new Worker<DispatchJobData>(
     "dispatch",
     async (job: Job<DispatchJobData>) => {
-      const { leadId, whatsapp, companyName, screenshotPath, message } = job.data;
+      const { leadId, whatsapp, companyName, screenshotPath, message, pageUrl } = job.data;
 
       // Verifica janela de horário (08:00–18:00 BRT) a menos que override manual esteja ativo
       if (!isWithinDispatchWindow() && !isManualOverrideActive()) {
@@ -30,6 +30,7 @@ export function createDispatchWorker(): Worker {
         message,
         screenshotPath,
         companyName,
+        ...(pageUrl ? { pageUrl } : {}),
       });
 
       if (!success) {

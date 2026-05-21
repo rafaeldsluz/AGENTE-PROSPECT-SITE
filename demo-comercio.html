@@ -1,43 +1,9 @@
-import type { TemplateData } from "../../../types/template.types.js";
-
-export function renderComercioTemplate(data: TemplateData): string {
-  const whatsappUrl = `https://wa.me/55${data.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsappMessage)}`;
-
-  const services = data.services
-    .map(
-      (s, i) => `
-      <div class="group relative bg-zinc-900 border border-zinc-800 hover:border-yellow-500/40 p-7 transition-all duration-300 hover:-translate-y-1">
-        <div class="absolute top-0 right-0 w-16 h-16 bg-yellow-500/5 group-hover:bg-yellow-500/10 transition-colors duration-300 rounded-bl-3xl"></div>
-        <span class="block text-yellow-600/40 font-mono text-xs tracking-[0.3em] mb-4">0${i + 1}</span>
-        <div class="text-3xl mb-4 opacity-80">${s.icon}</div>
-        <h3 class="text-zinc-100 font-bold text-base mb-2 leading-tight">${s.name}</h3>
-        <p class="text-zinc-400 text-sm leading-relaxed">${s.description}</p>
-      </div>`
-    )
-    .join("");
-
-  const differentials = data.differentials
-    .map(
-      (d) => `
-      <div class="flex items-start gap-4 py-4 border-b border-zinc-800/60 last:border-0">
-        <div class="w-6 h-6 bg-yellow-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-          <svg class="w-3.5 h-3.5 text-black" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414L8.414 15 3.293 9.879a1 1 0 011.414-1.414L8.414 12.172l6.879-6.879a1 1 0 011.414 0z"/></svg>
-        </div>
-        <span class="text-zinc-300 text-sm leading-relaxed">${d}</span>
-      </div>`
-    )
-    .join("");
-
-  const instagramLink = data.instagram
-    ? `<a href="https://instagram.com/${data.instagram.replace("@", "")}" target="_blank" class="hover:text-yellow-400 transition-colors">${data.instagram}</a>`
-    : "";
-
-  return `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${data.companyName}</title>
+  <title>Forte Materiais — Construção &amp; Acabamentos</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800&family=Barlow+Condensed:wght@700;800;900&display=swap" rel="stylesheet" />
@@ -51,30 +17,6 @@ export function renderComercioTemplate(data: TemplateData): string {
         linear-gradient(rgba(245,184,0,0.03) 1px, transparent 1px),
         linear-gradient(90deg, rgba(245,184,0,0.03) 1px, transparent 1px);
       background-size: 48px 48px;
-    }
-    .stripe-accent {
-      background: repeating-linear-gradient(
-        45deg,
-        #f5b800,
-        #f5b800 4px,
-        transparent 4px,
-        transparent 16px
-      );
-    }
-    .promo-card {
-      background: linear-gradient(135deg, #f5b800 0%, #d4920a 100%);
-    }
-    .wp-bounce { animation: bounce 2s ease-in-out infinite; }
-    @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
-    .text-shadow { text-shadow: 0 2px 20px rgba(245,184,0,0.2); }
-    .corner-mark::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 4px;
-      height: 100%;
-      background: #f5b800;
     }
     .hero-bg-img {
       background-image:
@@ -90,6 +32,14 @@ export function renderComercioTemplate(data: TemplateData): string {
       background-size: cover;
       background-position: center;
     }
+    .stripe-accent {
+      background: repeating-linear-gradient(
+        45deg, #f5b800, #f5b800 4px, transparent 4px, transparent 16px
+      );
+    }
+    .promo-card { background: linear-gradient(135deg, #f5b800 0%, #d4920a 100%); }
+    .wp-bounce { animation: bounce 2s ease-in-out infinite; }
+    @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
   </style>
 </head>
 <body class="antialiased">
@@ -97,23 +47,16 @@ export function renderComercioTemplate(data: TemplateData): string {
   <!-- NAV -->
   <nav class="fixed top-0 left-0 right-0 z-50 bg-black/90 backdrop-blur-xl border-b border-zinc-800">
     <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        ${data.logoUrl
-          ? `<img src="${data.logoUrl}" alt="${data.companyName}" class="h-9 w-auto object-contain" />`
-          : `<div class="flex items-center gap-2">
-               <div class="w-8 h-8 yellow-bg flex items-center justify-center font-black text-black text-sm">${data.companyName[0]}</div>
-               <span class="font-bold text-white text-sm uppercase tracking-wide">${data.companyName}</span>
-             </div>`
-        }
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 yellow-bg flex items-center justify-center font-black text-black text-sm">F</div>
+        <span class="font-bold text-white text-sm uppercase tracking-wide">Forte Materiais</span>
       </div>
       <div class="hidden md:flex items-center gap-8 text-zinc-400 text-sm font-medium uppercase tracking-wide">
         <a href="#produtos" class="hover:text-yellow-400 transition-colors">Produtos</a>
         <a href="#diferenciais" class="hover:text-yellow-400 transition-colors">Diferenciais</a>
         <a href="#contato" class="hover:text-yellow-400 transition-colors">Contato</a>
       </div>
-      <a href="${whatsappUrl}" target="_blank"
-         class="inline-flex items-center gap-2 yellow-bg hover:bg-yellow-400 text-black font-bold text-xs px-5 py-2.5 uppercase tracking-wider transition-all duration-200">
-        <svg class="w-4 h-4 fill-black" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 17.36c-.833 1.246-2.064 2.1-3.468 2.426a9.9 9.9 0 01-2.426.307c-1.73 0-3.423-.447-4.916-1.306L2 20l1.22-5.03A9.868 9.868 0 012.1 12C2.1 6.545 6.545 2.1 12 2.1S21.9 6.545 21.9 12a9.87 9.87 0 01-4.006 5.36z"/></svg>
+      <a href="#" class="inline-flex items-center gap-2 yellow-bg hover:bg-yellow-400 text-black font-bold text-xs px-5 py-2.5 uppercase tracking-wider transition-all">
         WhatsApp
       </a>
     </div>
@@ -123,31 +66,28 @@ export function renderComercioTemplate(data: TemplateData): string {
   <section class="pt-16 hero-bg-img hero-grid min-h-screen flex items-center relative overflow-hidden bg-zinc-950">
     <div class="absolute top-0 left-0 w-full h-1 yellow-bg opacity-80"></div>
     <div class="absolute right-0 top-0 bottom-0 w-1 stripe-accent opacity-10"></div>
-    <div class="absolute top-1/3 right-1/4 w-[400px] h-[400px] rounded-full bg-yellow-500/3 blur-[100px]"></div>
 
     <div class="max-w-6xl mx-auto px-6 py-24 relative z-10 w-full">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         <div class="lg:col-span-8">
           <div class="flex items-center gap-3 mb-8">
             <div class="stripe-accent w-12 h-5 opacity-60"></div>
-            <span class="text-yellow-500 text-xs font-bold uppercase tracking-[0.4em]">${data.city} — Qualidade Garantida</span>
+            <span class="text-yellow-500 text-xs font-bold uppercase tracking-[0.4em]">Porto Alegre — Qualidade Garantida</span>
           </div>
-          <h1 class="condensed text-6xl md:text-7xl lg:text-8xl font-black uppercase leading-none text-shadow mb-6">
-            <span class="block text-white">${data.heroHeadline.split(" ").slice(0, 2).join(" ")}</span>
-            <span class="block yellow">${data.heroHeadline.split(" ").slice(2).join(" ")}</span>
+          <h1 class="condensed text-6xl md:text-7xl lg:text-8xl font-black uppercase leading-none mb-6">
+            <span class="block text-white">Materiais de</span>
+            <span class="block yellow">construção</span>
           </h1>
-          <p class="text-zinc-400 text-lg leading-relaxed mb-10 max-w-xl font-light">${data.heroSubtitle}</p>
-
+          <p class="text-zinc-400 text-lg leading-relaxed mb-10 max-w-xl font-light">
+            Tudo para sua obra, reforma e acabamento em um só lugar. Porcelanato, cimento, ferramentas, elétrica e hidráulica com os melhores preços da região.
+          </p>
           <div class="flex flex-col sm:flex-row gap-4 mb-12">
-            <a href="${whatsappUrl}" target="_blank"
-               class="wp-bounce inline-flex items-center justify-center gap-3 bg-green-600 hover:bg-green-500 text-white font-bold uppercase tracking-wide text-sm px-8 py-4 transition-all duration-200 shadow-xl shadow-green-900/40">
+            <a href="#" class="wp-bounce inline-flex items-center justify-center gap-3 bg-green-600 hover:bg-green-500 text-white font-bold uppercase tracking-wide text-sm px-8 py-4 transition-all shadow-xl shadow-green-900/40">
               <svg class="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 17.36c-.833 1.246-2.064 2.1-3.468 2.426a9.9 9.9 0 01-2.426.307c-1.73 0-3.423-.447-4.916-1.306L2 20l1.22-5.03A9.868 9.868 0 012.1 12C2.1 6.545 6.545 2.1 12 2.1S21.9 6.545 21.9 12a9.87 9.87 0 01-4.006 5.36z"/></svg>
-              ${data.ctaText}
+              Pedir Orçamento
             </a>
-            <a href="tel:${data.phone.replace(/\D/g, "")}"
-               class="inline-flex items-center justify-center gap-2 border border-zinc-700 hover:border-yellow-500/60 text-zinc-300 hover:text-yellow-300 font-medium text-sm px-8 py-4 transition-all duration-200">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 7V5z"/></svg>
-              ${data.phone}
+            <a href="#" class="inline-flex items-center justify-center gap-2 border border-zinc-700 hover:border-yellow-500/60 text-zinc-300 hover:text-yellow-300 font-medium text-sm px-8 py-4 transition-all">
+              (51) 3333-4444
             </a>
           </div>
         </div>
@@ -156,25 +96,21 @@ export function renderComercioTemplate(data: TemplateData): string {
         <div class="lg:col-span-4">
           <div class="promo-card p-7 text-black relative overflow-hidden">
             <div class="absolute -top-6 -right-6 w-24 h-24 bg-black/10 rounded-full"></div>
-            <div class="absolute -bottom-4 -left-4 w-16 h-16 bg-black/10 rounded-full"></div>
             <p class="font-black uppercase text-xs tracking-[0.3em] mb-3 opacity-70">Oferta Especial</p>
             <p class="condensed font-black text-4xl leading-tight mb-3">ATÉ 10x<br />SEM JUROS</p>
             <p class="text-sm font-medium opacity-80 mb-5">nas compras acima de R$ 500</p>
-            <a href="${whatsappUrl}" target="_blank"
-               class="inline-flex items-center gap-2 bg-black text-yellow-400 font-bold text-xs px-5 py-2.5 uppercase tracking-wider hover:bg-zinc-900 transition-colors">
+            <a href="#" class="inline-flex items-center gap-2 bg-black text-yellow-400 font-bold text-xs px-5 py-2.5 uppercase tracking-wider hover:bg-zinc-900 transition-colors">
               Aproveitar oferta
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </a>
           </div>
-
-          <!-- STATS -->
           <div class="mt-4 grid grid-cols-2 gap-px bg-zinc-800">
             <div class="bg-zinc-900 px-5 py-4">
-              <div class="yellow font-black text-2xl condensed">${data.reviewCount ? `${Math.floor((data.reviewCount as number) / 10) * 10}+` : "500+"}</div>
+              <div class="yellow font-black text-2xl condensed">2.000+</div>
               <div class="text-zinc-500 text-xs uppercase tracking-wider mt-1">Clientes</div>
             </div>
             <div class="bg-zinc-900 px-5 py-4">
-              <div class="yellow font-black text-2xl condensed">${data.rating?.toFixed(1) ?? "5.0"}★</div>
+              <div class="yellow font-black text-2xl condensed">4.8★</div>
               <div class="text-zinc-500 text-xs uppercase tracking-wider mt-1">Google</div>
             </div>
           </div>
@@ -183,7 +119,7 @@ export function renderComercioTemplate(data: TemplateData): string {
     </div>
   </section>
 
-  <!-- PRODUTOS/SERVIÇOS -->
+  <!-- PRODUTOS -->
   <section id="produtos" class="py-24 bg-zinc-900">
     <div class="max-w-6xl mx-auto px-6">
       <div class="flex items-end justify-between mb-12 pb-6 border-b border-zinc-800">
@@ -191,20 +127,43 @@ export function renderComercioTemplate(data: TemplateData): string {
           <span class="yellow text-xs font-bold uppercase tracking-[0.35em] block mb-2">Catálogo</span>
           <h2 class="condensed text-4xl md:text-5xl font-black uppercase text-white">Produtos & <span class="yellow">Serviços</span></h2>
         </div>
-        <a href="${whatsappUrl}" target="_blank" class="hidden md:inline-flex items-center gap-2 text-yellow-500 text-sm font-medium hover:text-yellow-400 uppercase tracking-wide">
-          Ver tudo
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-        </a>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-zinc-800/50">
-        ${services}
+        <div class="group relative bg-zinc-900 border border-zinc-800 hover:border-yellow-500/40 p-7 transition-all hover:-translate-y-1">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-yellow-500/5 group-hover:bg-yellow-500/10 transition-colors rounded-bl-3xl"></div>
+          <span class="block text-yellow-600/40 font-mono text-xs tracking-[0.3em] mb-4">01</span>
+          <div class="text-3xl mb-4 opacity-80">🏗️</div>
+          <h3 class="text-zinc-100 font-bold text-base mb-2">Cimento e Argamassa</h3>
+          <p class="text-zinc-400 text-sm leading-relaxed">Linha completa Votoran, Votorantim e marcas premium para toda sua obra.</p>
+        </div>
+        <div class="group relative bg-zinc-900 border border-zinc-800 hover:border-yellow-500/40 p-7 transition-all hover:-translate-y-1">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-yellow-500/5 group-hover:bg-yellow-500/10 transition-colors rounded-bl-3xl"></div>
+          <span class="block text-yellow-600/40 font-mono text-xs tracking-[0.3em] mb-4">02</span>
+          <div class="text-3xl mb-4 opacity-80">🪨</div>
+          <h3 class="text-zinc-100 font-bold text-base mb-2">Porcelanato e Revestimentos</h3>
+          <p class="text-zinc-400 text-sm leading-relaxed">Acabamentos premium, pisos técnicos e revestimentos para ambientes residenciais e comerciais.</p>
+        </div>
+        <div class="group relative bg-zinc-900 border border-zinc-800 hover:border-yellow-500/40 p-7 transition-all hover:-translate-y-1">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-yellow-500/5 group-hover:bg-yellow-500/10 transition-colors rounded-bl-3xl"></div>
+          <span class="block text-yellow-600/40 font-mono text-xs tracking-[0.3em] mb-4">03</span>
+          <div class="text-3xl mb-4 opacity-80">🔧</div>
+          <h3 class="text-zinc-100 font-bold text-base mb-2">Ferramentas e Equipamentos</h3>
+          <p class="text-zinc-400 text-sm leading-relaxed">Ferramentas manuais e elétricas das marcas Bosch, DeWalt e Stanley.</p>
+        </div>
+        <div class="group relative bg-zinc-900 border border-zinc-800 hover:border-yellow-500/40 p-7 transition-all hover:-translate-y-1">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-yellow-500/5 group-hover:bg-yellow-500/10 transition-colors rounded-bl-3xl"></div>
+          <span class="block text-yellow-600/40 font-mono text-xs tracking-[0.3em] mb-4">04</span>
+          <div class="text-3xl mb-4 opacity-80">💡</div>
+          <h3 class="text-zinc-100 font-bold text-base mb-2">Elétrica e Hidráulica</h3>
+          <p class="text-zinc-400 text-sm leading-relaxed">Fios, tubulações, conexões e tudo para instalações elétricas e hidráulicas.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- FAIXA VISUAL — materiais/obra -->
+  <!-- FAIXA VISUAL -->
   <div class="construcao-strip h-48 w-full flex items-center justify-center">
-    <span class="text-white/20 condensed font-black text-6xl uppercase tracking-widest select-none">Qualidade · Solidez · Confiança</span>
+    <span class="text-white/20 condensed font-black text-5xl uppercase tracking-widest select-none">Qualidade · Solidez · Confiança</span>
   </div>
 
   <!-- DIFERENCIAIS -->
@@ -217,34 +176,57 @@ export function renderComercioTemplate(data: TemplateData): string {
             Compromisso com<br /><span class="yellow">qualidade real</span>
           </h2>
           <div>
-            ${differentials}
+            <div class="flex items-start gap-4 py-4 border-b border-zinc-800/60">
+              <div class="w-6 h-6 yellow-bg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-3.5 h-3.5 text-black" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414L8.414 15 3.293 9.879a1 1 0 011.414-1.414L8.414 12.172l6.879-6.879a1 1 0 011.414 0z"/></svg>
+              </div>
+              <span class="text-zinc-300 text-sm leading-relaxed">Mais de 10 anos no mercado servindo construtoras, engenheiros e autônomos</span>
+            </div>
+            <div class="flex items-start gap-4 py-4 border-b border-zinc-800/60">
+              <div class="w-6 h-6 yellow-bg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-3.5 h-3.5 text-black" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414L8.414 15 3.293 9.879a1 1 0 011.414-1.414L8.414 12.172l6.879-6.879a1 1 0 011.414 0z"/></svg>
+              </div>
+              <span class="text-zinc-300 text-sm leading-relaxed">Entrega rápida em toda a região metropolitana — frete grátis acima de R$ 800</span>
+            </div>
+            <div class="flex items-start gap-4 py-4 border-b border-zinc-800/60">
+              <div class="w-6 h-6 yellow-bg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-3.5 h-3.5 text-black" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414L8.414 15 3.293 9.879a1 1 0 011.414-1.414L8.414 12.172l6.879-6.879a1 1 0 011.414 0z"/></svg>
+              </div>
+              <span class="text-zinc-300 text-sm leading-relaxed">Parcelamento em até 10x sem juros no cartão ou 10% de desconto no PIX</span>
+            </div>
+            <div class="flex items-start gap-4 py-4">
+              <div class="w-6 h-6 yellow-bg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-3.5 h-3.5 text-black" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414L8.414 15 3.293 9.879a1 1 0 011.414-1.414L8.414 12.172l6.879-6.879a1 1 0 011.414 0z"/></svg>
+              </div>
+              <span class="text-zinc-300 text-sm leading-relaxed">Atendimento técnico especializado para ajudar na escolha dos materiais certos</span>
+            </div>
           </div>
-          ${data.testimonials[0] ? `
           <blockquote class="mt-8 border-l-2 border-yellow-500 pl-5">
-            <p class="text-zinc-400 text-sm italic leading-relaxed">"${data.testimonials[0].text}"</p>
-            <cite class="text-zinc-500 text-xs mt-2 block">— ${data.testimonials[0].author}</cite>
-          </blockquote>` : ""}
+            <p class="text-zinc-400 text-sm italic leading-relaxed">"Compro aqui há 7 anos para todas as minhas obras. Qualidade excelente e entrega sempre no prazo. Recomendo sem hesitar!"</p>
+            <cite class="text-zinc-500 text-xs mt-2 block">— Engenheiro Carlos Mendes</cite>
+          </blockquote>
         </div>
 
-        <!-- CTA LATERAL -->
         <div class="relative">
           <div class="bg-zinc-900 border border-zinc-800 p-8">
             <div class="absolute top-0 left-0 w-1 h-full yellow-bg"></div>
-            <h3 class="condensed text-2xl font-black uppercase text-white mb-2">Fale com a Gente</h3>
+            <h3 class="condensed text-2xl font-black uppercase text-white mb-2">Solicite seu Orçamento</h3>
             <p class="text-zinc-400 text-sm mb-6">Atendimento rápido pelo WhatsApp. Orçamentos sem compromisso.</p>
             <div class="space-y-3 mb-8">
               <div class="flex items-center gap-3 text-zinc-300 text-sm">
                 <span class="yellow text-lg">📍</span>
-                ${data.address}
+                Av. Industrial, 1500 — Porto Alegre, RS
               </div>
               <div class="flex items-center gap-3 text-zinc-300 text-sm">
                 <span class="yellow text-lg">📞</span>
-                ${data.phone}
+                (51) 3333-4444
               </div>
-              ${data.instagram ? `<div class="flex items-center gap-3 text-zinc-300 text-sm"><span class="yellow text-lg">📸</span>${data.instagram}</div>` : ""}
+              <div class="flex items-center gap-3 text-zinc-300 text-sm">
+                <span class="yellow text-lg">🕐</span>
+                Seg–Sex 7h–18h · Sáb 7h–13h
+              </div>
             </div>
-            <a href="${whatsappUrl}" target="_blank"
-               class="w-full inline-flex items-center justify-center gap-3 bg-green-600 hover:bg-green-500 text-white font-bold uppercase tracking-wide text-sm px-6 py-4 transition-all duration-200">
+            <a href="#" class="w-full inline-flex items-center justify-center gap-3 bg-green-600 hover:bg-green-500 text-white font-bold uppercase tracking-wide text-sm px-6 py-4 transition-all">
               <svg class="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 17.36c-.833 1.246-2.064 2.1-3.468 2.426a9.9 9.9 0 01-2.426.307c-1.73 0-3.423-.447-4.916-1.306L2 20l1.22-5.03A9.868 9.868 0 012.1 12C2.1 6.545 6.545 2.1 12 2.1S21.9 6.545 21.9 12a9.87 9.87 0 01-4.006 5.36z"/></svg>
               Solicitar Orçamento
             </a>
@@ -258,38 +240,32 @@ export function renderComercioTemplate(data: TemplateData): string {
   <section id="contato" class="yellow-bg py-20">
     <div class="max-w-4xl mx-auto px-6 text-center">
       <p class="font-black uppercase text-xs tracking-[0.4em] text-black/50 mb-3">Venha nos visitar</p>
-      <h2 class="condensed text-5xl md:text-6xl font-black uppercase text-black leading-tight mb-4">
-        ${data.companyName}
-      </h2>
-      <p class="text-black/60 text-base mb-8 font-medium">${data.address} · ${data.city}</p>
+      <h2 class="condensed text-5xl md:text-6xl font-black uppercase text-black leading-tight mb-4">Forte Materiais</h2>
+      <p class="text-black/60 text-base mb-8 font-medium">Av. Industrial, 1500 — Porto Alegre, RS</p>
       <div class="flex flex-col sm:flex-row gap-4 justify-center">
-        <a href="${whatsappUrl}" target="_blank"
-           class="inline-flex items-center justify-center gap-3 bg-black text-yellow-400 font-bold uppercase tracking-wide text-sm px-10 py-4 hover:bg-zinc-900 transition-all duration-200 shadow-xl">
+        <a href="#" class="inline-flex items-center justify-center gap-3 bg-black text-yellow-400 font-bold uppercase tracking-wide text-sm px-10 py-4 hover:bg-zinc-900 transition-all shadow-xl">
           <svg class="w-5 h-5 fill-green-400" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 17.36c-.833 1.246-2.064 2.1-3.468 2.426a9.9 9.9 0 01-2.426.307c-1.73 0-3.423-.447-4.916-1.306L2 20l1.22-5.03A9.868 9.868 0 012.1 12C2.1 6.545 6.545 2.1 12 2.1S21.9 6.545 21.9 12a9.87 9.87 0 01-4.006 5.36z"/></svg>
           Pedir Orçamento
         </a>
-        <a href="tel:${data.phone.replace(/\D/g, "")}"
-           class="inline-flex items-center justify-center gap-2 border-2 border-black text-black font-bold uppercase tracking-wide text-sm px-10 py-4 hover:bg-black/10 transition-all duration-200">
+        <a href="#" class="inline-flex items-center justify-center gap-2 border-2 border-black text-black font-bold uppercase tracking-wide text-sm px-10 py-4 hover:bg-black/10 transition-all">
           Ligar Agora
         </a>
       </div>
     </div>
   </section>
 
-  <!-- RODAPÉ -->
   <footer class="bg-black border-t border-zinc-900 py-8">
     <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
       <div>
-        <p class="text-white font-bold uppercase tracking-wide text-sm">${data.companyName}</p>
-        <p class="text-zinc-600 text-xs mt-1">${data.address}</p>
+        <p class="text-white font-bold uppercase tracking-wide text-sm">Forte Materiais de Construção</p>
+        <p class="text-zinc-600 text-xs mt-1">Av. Industrial, 1500 — Porto Alegre, RS</p>
       </div>
       <div class="flex items-center gap-6 text-zinc-600 text-xs">
-        ${instagramLink}
-        <span>${data.phone}</span>
+        <span>@fortemateriais</span>
+        <span>(51) 3333-4444</span>
       </div>
     </div>
   </footer>
 
 </body>
-</html>`;
-}
+</html>

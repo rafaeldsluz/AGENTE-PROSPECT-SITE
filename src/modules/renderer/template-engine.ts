@@ -9,6 +9,7 @@ import { renderImoveisTemplate } from "./templates/imoveis.template.js";
 import { renderAdvogadoTemplate } from "./templates/advogado.template.js";
 import { renderOficinaTemplate } from "./templates/oficina.template.js";
 import { renderComercioTemplate } from "./templates/comercio.template.js";
+import { renderAutomoveisTemplate } from "./templates/automoveis.template.js";
 
 const log = createModuleLogger("renderer");
 
@@ -20,6 +21,7 @@ const TEMPLATE_MAP: Record<Niche, TemplateRenderer> = {
   advogado: renderAdvogadoTemplate,
   servicos: renderOficinaTemplate,
   comercio: renderComercioTemplate,
+  automoveis: renderAutomoveisTemplate,
   outros: renderClinicaTemplate,
 };
 

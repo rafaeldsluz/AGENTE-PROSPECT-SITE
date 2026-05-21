@@ -13,11 +13,12 @@ export interface DispatchPayload {
   message: string;
   screenshotPath: string;
   companyName: string;
+  pageUrl?: string;
 }
 
 export class WhatsAppDispatcher {
   async dispatch(payload: DispatchPayload): Promise<boolean> {
-    const { leadId, phone, message, screenshotPath, companyName } = payload;
+    const { leadId, phone, message, screenshotPath, companyName, pageUrl } = payload;
 
     // Verifica rate limit
     const dispatchedInLastHour = await dispatchRepository.countDispatchedInLastHour();
@@ -54,14 +55,21 @@ export class WhatsAppDispatcher {
     try {
       log.info({ company: companyName, phone }, "Iniciando disparo");
 
+      // Monta mensagem final (com link se disponível)
+      const fullMessage = pageUrl
+        ? `${message}\n\n🔗 *Veja sua página completa aqui:*\n${pageUrl}`
+        : message;
+
       // Envia texto primeiro
-      textMessageId = await evolutionClient.sendText(phone, message);
+      textMessageId = await evolutionClient.sendText(phone, fullMessage);
 
       // Delay humanizado entre mensagens (3-8 segundos)
       await randomDelay(3_000, 8_000);
 
       // Envia screenshot como imagem
-      const imageCaption = `Essa é a demonstração visual que montei para a *${companyName}*. Uma landing page moderna, com seus serviços e WhatsApp integrado. O que achou?`;
+      const imageCaption = pageUrl
+        ? `Prévia da sua página, *${companyName}*. Acesse o link acima para ver completa e rolar o conteúdo. O que achou?`
+        : `Essa é a demonstração visual que montei para a *${companyName}*. Uma landing page moderna, com seus serviços e WhatsApp integrado. O que achou?`;
       imageMessageId = await evolutionClient.sendImage(phone, screenshotPath, imageCaption);
 
       // Registra no banco

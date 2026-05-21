@@ -3,6 +3,7 @@ import { deepseekChat } from "../../utils/deepseek-client.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import { withRetry } from "../../utils/retry.js";
 import { getCached, setCached, cacheTTL } from "../../utils/ai-cache.js";
+import { messageTemplateRepository } from "../../database/repositories/message-template.repository.js";
 import type { BusinessEnriched } from "../../types/business.types.js";
 
 const log = createModuleLogger("ai:message-generator");
@@ -18,6 +19,17 @@ const MESSAGE_TEMPLATES = [
 
 export class MessageGenerator {
   async generate(business: BusinessEnriched): Promise<string> {
+    // User-defined template takes priority — no caching needed, interpolation is cheap
+    try {
+      const userTemplate = await messageTemplateRepository.getForNiche(business.niche);
+      if (userTemplate) {
+        log.debug({ name: business.name, niche: business.niche }, "Usando template definido pelo usuário");
+        return this.interpolate(userTemplate, business);
+      }
+    } catch {
+      // DB unavailable — fall through to default behavior
+    }
+
     const cacheKey = `msg:${createHash("md5").update(`${business.placeId}|${business.niche}`).digest("hex")}`;
 
     const cached = await getCached<string>(cacheKey);
@@ -29,6 +41,15 @@ export class MessageGenerator {
     const message = await this.generateMessage(business);
     await setCached(cacheKey, message, cacheTTL.CONTENT);
     return message;
+  }
+
+  private interpolate(template: string, business: BusinessEnriched): string {
+    return template
+      .replace(/\{nome_empresa\}/g, business.name)
+      .replace(/\{cidade\}/g, business.city)
+      .replace(/\{telefone\}/g, business.phone ?? business.whatsapp ?? "")
+      .replace(/\{whatsapp\}/g, business.whatsapp ?? business.phone ?? "")
+      .replace(/\{promoção\}/g, "");
   }
 
   private async generateMessage(business: BusinessEnriched): Promise<string> {

@@ -118,6 +118,13 @@ export class LeadRepository {
       .where(eq(leads.id, id));
   }
 
+  async updatePageUrl(id: string, pageUrl: string): Promise<void> {
+    await db
+      .update(leads)
+      .set({ pageUrl, updatedAt: new Date() })
+      .where(eq(leads.id, id));
+  }
+
   async markDispatched(id: string): Promise<void> {
     await db
       .update(leads)

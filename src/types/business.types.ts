@@ -4,6 +4,7 @@ export type Niche =
   | "servicos"
   | "advogado"
   | "comercio"
+  | "automoveis"
   | "outros";
 
 export type LeadStatus =

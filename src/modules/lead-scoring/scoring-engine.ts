@@ -9,6 +9,7 @@ const NICHE_RELEVANCE: Record<Niche, number> = {
   clinica: 10,
   imoveis: 7,
   comercio: 7,
+  automoveis: 8,
   servicos: 5,
   outros: 3,
 };

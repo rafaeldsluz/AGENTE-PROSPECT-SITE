@@ -17,6 +17,7 @@ export interface DispatchJobData {
   companyName: string;
   screenshotPath: string;
   message: string;
+  pageUrl?: string;
 }
 
 export type QueueName =

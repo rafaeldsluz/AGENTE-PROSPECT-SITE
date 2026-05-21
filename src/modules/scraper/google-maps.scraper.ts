@@ -63,6 +63,14 @@ const NICHE_QUERIES: Record<string, string[]> = {
     "ferragem",
     "vidraçaria",
   ],
+  // Automóveis: concessionárias e multimarcas sem site perdem clientes online
+  automoveis: [
+    "concessionária de veículos",
+    "multimarcas de veículos",
+    "loja de carros seminovos",
+    "loja de motos",
+    "concessionária de carros usados",
+  ],
 };
 
 // Mapa reverso: query → niche (ex: "escritório de advocacia" → "advogado")

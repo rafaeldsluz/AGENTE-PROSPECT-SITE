@@ -13,6 +13,7 @@ import { config } from "../config/index.js";
 import { getDispatchStatus, setManualOverride } from "../modules/dispatch-schedule.js";
 
 import { dispatchRepository } from "../database/repositories/dispatch.repository.js";
+import { messageTemplateRepository } from "../database/repositories/message-template.repository.js";
 
 const log = createModuleLogger("dashboard");
 
@@ -51,6 +52,7 @@ const NICHE_ICONS: Record<string, string> = {
   servicos: "⚙️",
   advogado: "⚖️",
   comercio: "🏪",
+  automoveis: "🚗",
   outros: "📦",
 };
 
@@ -211,6 +213,12 @@ function buildDashboardHtml(): string {
     .toast-body { flex: 1; min-width: 0; }
     .toast-title { font-size: 12px; font-weight: 700; color: #e8edf5; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .toast-sub { font-size: 11px; color: #7d8ea6; margin-top: 2px; }
+    /* Message block */
+    .msg-tab { display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:600;border:1px solid var(--border);color:var(--text-secondary);background:transparent;cursor:pointer;transition:all 0.15s;white-space:nowrap; }
+    .msg-tab:hover { border-color:var(--border-hover);color:var(--text-primary); }
+    .msg-dot { display:inline-block;width:5px;height:5px;border-radius:50%;vertical-align:middle;margin-left:2px; }
+    .var-chip { display:inline-flex;align-items:center;padding:2px 9px;border-radius:5px;font-size:10px;font-family:monospace;border:1px solid rgba(99,102,241,0.3);background:rgba(99,102,241,0.08);color:#a5b4fc;cursor:pointer;transition:all 0.12s;user-select:none;letter-spacing:0.2px; }
+    .var-chip:hover { background:rgba(99,102,241,0.22);border-color:rgba(99,102,241,0.55); }
   </style>
 </head>
 <body>
@@ -381,6 +389,87 @@ function buildDashboardHtml(): string {
       </div>
     </div>
 
+    <!-- Mensagem WhatsApp Block -->
+    <div class="glass p-5" style="background:linear-gradient(135deg,rgba(34,197,94,0.05) 0%,var(--surface) 60%)">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+             style="background:linear-gradient(135deg,#22c55e,#16a34a)">💬</div>
+        <div>
+          <h2 class="text-sm font-bold text-white leading-tight">Mensagem WhatsApp</h2>
+          <p class="text-xs mt-0.5" style="color:var(--text-secondary)">Template enviado automaticamente para cada lead qualificado</p>
+        </div>
+        <div class="ml-auto">
+          <span id="msg-save-status" class="text-xs font-semibold" style="transition:color 0.2s"></span>
+        </div>
+      </div>
+      <!-- Niche tabs -->
+      <div id="msg-tabs" class="flex flex-wrap gap-1.5 mb-3"></div>
+      <!-- Active niche info -->
+      <p id="msg-niche-info" class="text-xs mb-4" style="color:var(--text-muted);min-height:16px"></p>
+      <!-- Editor + Preview -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <!-- Editor -->
+        <div>
+          <!-- Variable chips -->
+          <div class="flex flex-wrap items-center gap-1.5 mb-3 px-3 py-2.5 rounded-lg"
+               style="background:rgba(255,255,255,0.025);border:1px solid var(--border)">
+            <span class="text-xs font-semibold mr-1 shrink-0" style="color:var(--text-muted)">Variáveis:</span>
+            <button class="var-chip" onclick="insertVar('{nome_empresa}')">{nome_empresa}</button>
+            <button class="var-chip" onclick="insertVar('{cidade}')">{cidade}</button>
+            <button class="var-chip" onclick="insertVar('{telefone}')">{telefone}</button>
+            <button class="var-chip" onclick="insertVar('{whatsapp}')">{whatsapp}</button>
+            <button class="var-chip" onclick="insertVar('{promoção}')">{promoção}</button>
+          </div>
+          <!-- Textarea -->
+          <textarea id="msg-textarea" rows="7"
+            style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);padding:12px 14px;font-family:inherit;font-size:13px;line-height:1.65;width:100%;display:block;resize:none;outline:none;transition:border-color 0.15s"
+            placeholder="Mensagem padrão..."
+            oninput="msgUpdatePreview();msgMarkDirty()"
+            onfocus="this.style.borderColor='rgba(99,102,241,0.5)'"
+            onblur="this.style.borderColor='var(--border)'"></textarea>
+          <!-- Actions -->
+          <div class="flex items-center justify-between mt-3">
+            <div class="flex gap-2">
+              <button id="msg-save-btn" onclick="msgSave()" disabled
+                class="dispatch-btn active" style="padding:5px 14px;font-size:12px;opacity:0.5;cursor:not-allowed">
+                💾 Salvar
+              </button>
+              <button id="msg-reset-btn" onclick="msgReset()" disabled
+                class="retry-btn" style="opacity:0.35;cursor:not-allowed">
+                ↺ Redefinir
+              </button>
+            </div>
+            <span class="text-xs" style="color:var(--text-muted)">Auto-salva em 2s</span>
+          </div>
+        </div>
+        <!-- Preview -->
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-widest mb-3" style="color:var(--text-muted)">Preview — dados de amostra</p>
+          <div style="background:linear-gradient(160deg,#111b21,#0d1117);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:16px;min-height:160px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.06)">
+              <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#128c7e,#25d366);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">💬</div>
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#e2ffe6;line-height:1">WhatsApp Business</div>
+                <div style="font-size:9.5px;color:#4ade80;margin-top:2px">● Online</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <div style="width:24px;height:24px;border-radius:50%;background:#1f2d24;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:11px">👤</div>
+              <div style="background:#1f2d24;border-radius:0 10px 10px 10px;padding:10px 13px;max-width:calc(100% - 34px);position:relative">
+                <div style="position:absolute;top:0;left:-6px;width:0;height:0;border-top:6px solid #1f2d24;border-left:6px solid transparent"></div>
+                <div id="msg-preview" style="color:#e2ffe6;font-size:12.5px;line-height:1.6;word-break:break-word">
+                  <span style="color:#4b5c5e;font-style:italic;font-size:12px">Nenhum template definido</span>
+                </div>
+                <div style="text-align:right;margin-top:5px">
+                  <span style="color:#4ade80;font-size:9.5px">✓✓ Entregue · agora</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Falhas de Disparo -->
     <div class="glass p-5" id="failures-section" style="display:none">
       <div class="flex items-center gap-2 mb-4">
@@ -416,7 +505,7 @@ const NICHE_COLORS = {
   oficina:'#f97316', clinica:'#0ea5e9', restaurante:'#dc2626',
   academia:'#eab308', imoveis:'#10b981', estetica:'#ec4899',
   loja:'#a78bfa', servicos:'#94a3b8', advogado:'#8b5cf6',
-  comercio:'#f59e0b', outros:'#64748b',
+  comercio:'#f59e0b', automoveis:'#ef4444', outros:'#64748b',
 };
 
 const RETRYABLE = new Set(['scraped','validated','scored','page_generated','screenshot_ready','disqualified']);
@@ -859,6 +948,219 @@ document.addEventListener('DOMContentLoaded', () => {
   if (f) f.addEventListener('change', filterLeads);
 });
 
+// ── Message Templates Block ───────────────────────────────────────────────────
+var MSG_NICHES = [
+  { key: 'global',     label: 'Global',      icon: '🌐', color: '#6366f1' },
+  { key: 'clinica',    label: 'Clínica',      icon: '🏥', color: '#0ea5e9' },
+  { key: 'imoveis',    label: 'Imóveis',      icon: '🏠', color: '#10b981' },
+  { key: 'advogado',   label: 'Advogado',     icon: '⚖️', color: '#8b5cf6' },
+  { key: 'comercio',   label: 'Comércio',     icon: '🏪', color: '#f59e0b' },
+  { key: 'automoveis', label: 'Automóveis',   icon: '🚗', color: '#ef4444' },
+  { key: 'servicos',   label: 'Serviços',     icon: '⚙️', color: '#94a3b8' },
+  { key: 'outros',     label: 'Outros',       icon: '📦', color: '#64748b' }
+];
+
+var _msgCurrentNiche = 'global';
+var _msgTemplates = {};
+var _msgSaveTimeout = null;
+var _msgDirty = false;
+
+function msgLoadTemplates() {
+  fetch('/api/message-templates')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _msgTemplates = data || {};
+      msgRenderTabs();
+      msgSwitchTab('global');
+    })
+    .catch(function(e) { console.error('[msg-block]', e); });
+}
+
+function msgRenderTabs() {
+  var container = document.getElementById('msg-tabs');
+  if (!container) return;
+  var html = '';
+  MSG_NICHES.forEach(function(n) {
+    var hasCustom = !!_msgTemplates[n.key];
+    var isActive = n.key === _msgCurrentNiche;
+    var st = isActive ? 'background:' + n.color + '20;border-color:' + n.color + '60;color:' + n.color : '';
+    html += '<button class="msg-tab' + (isActive ? ' active' : '') + '" onclick="msgSwitchTab(\'' + n.key + '\')" style="' + st + '">'
+      + n.icon + ' ' + n.label
+      + (hasCustom ? ' <span class="msg-dot" style="background:' + n.color + '"></span>' : '')
+      + '</button>';
+  });
+  container.innerHTML = html;
+}
+
+function msgSwitchTab(niche) {
+  _msgCurrentNiche = niche;
+  var nicheInfo = null;
+  MSG_NICHES.forEach(function(n) { if (n.key === niche) nicheInfo = n; });
+
+  var textarea = document.getElementById('msg-textarea');
+  if (textarea) {
+    textarea.value = _msgTemplates[niche] || '';
+    textarea.placeholder = niche === 'global'
+      ? 'Mensagem global padrão (fallback para todos os nichos)...'
+      : 'Mensagem específica para ' + (nicheInfo ? nicheInfo.label : niche) + ' (vazio = usa o global)...';
+  }
+
+  var info = document.getElementById('msg-niche-info');
+  if (info) {
+    if (niche === 'global') {
+      info.textContent = 'Fallback usado quando não há template específico para o nicho do lead';
+    } else if (_msgTemplates[niche]) {
+      info.textContent = 'Template personalizado ativo para ' + (nicheInfo ? nicheInfo.label : niche);
+    } else {
+      info.textContent = 'Nenhum template específico — usará o global ou o comportamento automático da IA';
+    }
+  }
+
+  _msgDirty = false;
+  msgUpdateActions();
+  msgRenderTabs();
+  msgUpdatePreview();
+}
+
+function msgUpdatePreview() {
+  var textarea = document.getElementById('msg-textarea');
+  var preview = document.getElementById('msg-preview');
+  if (!textarea || !preview) return;
+
+  var text = (textarea.value || '').trim();
+  if (!text) {
+    preview.innerHTML = '<span style="color:#4b5c5e;font-style:italic;font-size:12px">'
+      + (_msgCurrentNiche === 'global' ? 'Sem template global — IA gerará mensagens automáticas' : 'Vazio — usará template global ou automático')
+      + '</span>';
+    return;
+  }
+
+  // HTML-escape then interpolate sample values with highlight
+  var rendered = esc(text)
+    .replace(/\\{nome_empresa\\}/g, '<span style="color:#86efac;font-weight:600">Auto Veículos Premium</span>')
+    .replace(/\\{cidade\\}/g, '<span style="color:#86efac;font-weight:600">São Paulo</span>')
+    .replace(/\\{telefone\\}/g, '<span style="color:#86efac;font-weight:600">(11) 9999-8888</span>')
+    .replace(/\\{whatsapp\\}/g, '<span style="color:#86efac;font-weight:600">(11) 9999-8888</span>')
+    .replace(/\\{promoção\\}/g, '<span style="color:#86efac;font-weight:600">10% OFF</span>')
+    .replace(/\\*([^*\\n]+)\\*/g, '<b>$1</b>')
+    .replace(/\\n/g, '<br>');
+
+  preview.innerHTML = rendered;
+}
+
+function insertVar(v) {
+  var textarea = document.getElementById('msg-textarea');
+  if (!textarea) return;
+  var start = textarea.selectionStart || 0;
+  var end = textarea.selectionEnd || 0;
+  var text = textarea.value || '';
+  textarea.value = text.slice(0, start) + v + text.slice(end);
+  textarea.selectionStart = textarea.selectionEnd = start + v.length;
+  textarea.focus();
+  msgUpdatePreview();
+  msgMarkDirty();
+}
+
+function msgMarkDirty() {
+  _msgDirty = true;
+  msgUpdateActions();
+  clearTimeout(_msgSaveTimeout);
+  _msgSaveTimeout = setTimeout(function() { if (_msgDirty) msgSaveImpl(true); }, 2000);
+}
+
+function msgUpdateActions() {
+  var saveBtn = document.getElementById('msg-save-btn');
+  var resetBtn = document.getElementById('msg-reset-btn');
+  if (saveBtn) {
+    saveBtn.disabled = !_msgDirty;
+    saveBtn.style.opacity = _msgDirty ? '1' : '0.5';
+    saveBtn.style.cursor = _msgDirty ? 'pointer' : 'not-allowed';
+  }
+  if (resetBtn) {
+    var hasCustom = !!_msgTemplates[_msgCurrentNiche];
+    resetBtn.disabled = !hasCustom;
+    resetBtn.style.opacity = hasCustom ? '1' : '0.35';
+    resetBtn.style.cursor = hasCustom ? 'pointer' : 'not-allowed';
+  }
+}
+
+function msgSaveImpl(isAutoSave) {
+  var textarea = document.getElementById('msg-textarea');
+  if (!textarea) return;
+  var template = (textarea.value || '').trim();
+  var status = document.getElementById('msg-save-status');
+
+  if (status) { status.textContent = 'Salvando...'; status.style.color = 'var(--text-muted)'; }
+
+  var url = '/api/message-templates/' + _msgCurrentNiche;
+
+  if (template) {
+    fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template: template })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function() {
+        _msgTemplates[_msgCurrentNiche] = template;
+        _msgDirty = false;
+        msgUpdateActions();
+        msgRenderTabs();
+        if (status) {
+          status.textContent = isAutoSave ? '✓ Auto-salvo' : '✓ Salvo!';
+          status.style.color = '#22c55e';
+          setTimeout(function() { if (status) status.textContent = ''; }, 3000);
+        }
+      })
+      .catch(function() {
+        if (status) { status.textContent = '✗ Erro ao salvar'; status.style.color = '#ef4444'; }
+      });
+  } else {
+    fetch(url, { method: 'DELETE' })
+      .then(function(r) { return r.json(); })
+      .then(function() {
+        delete _msgTemplates[_msgCurrentNiche];
+        _msgDirty = false;
+        msgUpdateActions();
+        msgRenderTabs();
+        if (status) {
+          status.textContent = '↺ Template removido';
+          status.style.color = '#f59e0b';
+          setTimeout(function() { if (status) status.textContent = ''; }, 3000);
+        }
+      })
+      .catch(function() {
+        if (status) { status.textContent = '✗ Erro'; status.style.color = '#ef4444'; }
+      });
+  }
+}
+
+function msgReset() {
+  var nicheInfo = null;
+  MSG_NICHES.forEach(function(n) { if (n.key === _msgCurrentNiche) nicheInfo = n; });
+  var label = nicheInfo ? nicheInfo.label : _msgCurrentNiche;
+  if (!confirm('Redefinir template de ' + label + '? O sistema voltará ao comportamento padrão.')) return;
+  fetch('/api/message-templates/' + _msgCurrentNiche, { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      delete _msgTemplates[_msgCurrentNiche];
+      var textarea = document.getElementById('msg-textarea');
+      if (textarea) textarea.value = '';
+      _msgDirty = false;
+      msgUpdateActions();
+      msgRenderTabs();
+      msgUpdatePreview();
+      showToast('↺', 'Template redefinido', label + ' voltará ao padrão automático', false);
+    })
+    .catch(console.error);
+}
+
+window.insertVar = insertVar;
+window.msgSwitchTab = msgSwitchTab;
+window.msgSave = function() { msgSaveImpl(false); };
+window.msgReset = msgReset;
+msgLoadTemplates();
+
 // ── SSE ──────────────────────────────────────────────────────────────────────
 function connect() {
   const dot = document.getElementById('live-dot');
@@ -1024,6 +1326,51 @@ export function createDashboardServer(port = 3000): Server {
 
     log.info({ leadId: id, name: lead.name }, "Lead reprocessado via dashboard");
     res.json({ ok: true, message: `Lead "${lead.name}" reprocessado` });
+  });
+
+  app.get("/api/message-templates", async (_req: Request, res: Response) => {
+    try {
+      const rows = await messageTemplateRepository.getAll();
+      const result: Record<string, string> = {};
+      for (const row of rows) result[row.niche] = row.template;
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ ok: false, error: String(err) });
+    }
+  });
+
+  app.put("/api/message-templates/:niche", async (req: Request, res: Response) => {
+    const rawNiche = req.params["niche"];
+    const niche = Array.isArray(rawNiche) ? rawNiche[0] : rawNiche;
+    if (!niche) { res.status(400).json({ ok: false, error: "nicho inválido" }); return; }
+
+    const body = req.body as { template?: unknown };
+    if (!body.template || typeof body.template !== "string") {
+      res.status(400).json({ ok: false, error: "campo 'template' obrigatório" });
+      return;
+    }
+
+    try {
+      await messageTemplateRepository.upsert(niche, body.template.trim());
+      log.info({ niche }, "Template de mensagem atualizado via dashboard");
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: String(err) });
+    }
+  });
+
+  app.delete("/api/message-templates/:niche", async (req: Request, res: Response) => {
+    const rawNiche = req.params["niche"];
+    const niche = Array.isArray(rawNiche) ? rawNiche[0] : rawNiche;
+    if (!niche) { res.status(400).json({ ok: false, error: "nicho inválido" }); return; }
+
+    try {
+      await messageTemplateRepository.deleteByNiche(niche);
+      log.info({ niche }, "Template de mensagem removido via dashboard");
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: String(err) });
+    }
   });
 
   app.get("/", (_req: Request, res: Response) => {

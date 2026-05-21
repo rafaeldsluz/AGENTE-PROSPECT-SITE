@@ -577,6 +577,7 @@ const TEMPLATE_MAP: Record<Niche, (data: TemplateData) => string> = {
   imoveis: buildImoveisHtml,
   servicos: buildServicosHtml,
   comercio: buildComercioHtml,
+  automoveis: buildComercioHtml,
   outros: buildOutrosHtml,
 };
 
