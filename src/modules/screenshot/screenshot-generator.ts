@@ -60,7 +60,7 @@ export class ScreenshotGenerator {
             ));
           })
         ),
-        sleep(1_500), // timeout máximo de espera
+        sleep(4_000), // tempo para imagens CDN (Unsplash) carregarem
       ]);
 
       const sanitized = companyName

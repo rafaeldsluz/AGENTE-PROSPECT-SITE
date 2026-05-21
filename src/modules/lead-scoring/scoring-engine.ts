@@ -7,11 +7,11 @@ const log = createModuleLogger("lead-scoring");
 const NICHE_RELEVANCE: Record<Niche, number> = {
   advogado: 10,
   clinica: 10,
-  imoveis: 7,
+  automoveis: 9,
+  imoveis: 8,
   comercio: 7,
-  automoveis: 8,
-  servicos: 5,
-  outros: 3,
+  servicos: 0, // nicho desabilitado — disqualifica automaticamente
+  outros: 0,   // nicho desabilitado — disqualifica automaticamente
 };
 
 export class ScoringEngine {

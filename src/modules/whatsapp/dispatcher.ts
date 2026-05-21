@@ -20,13 +20,6 @@ export class WhatsAppDispatcher {
   async dispatch(payload: DispatchPayload): Promise<boolean> {
     const { leadId, phone, message, screenshotPath, companyName, pageUrl } = payload;
 
-    // Verifica rate limit
-    const dispatchedInLastHour = await dispatchRepository.countDispatchedInLastHour();
-    if (dispatchedInLastHour >= config.whatsapp.maxPerHour) {
-      log.warn({ dispatchedInLastHour, max: config.whatsapp.maxPerHour }, "Rate limit atingido, aguardando");
-      return false;
-    }
-
     // Verifica se já enviou para este lead
     const alreadySent = await dispatchRepository.hasDispatchedToLead(leadId);
     if (alreadySent) {
@@ -62,9 +55,6 @@ export class WhatsAppDispatcher {
 
       // Envia texto primeiro
       textMessageId = await evolutionClient.sendText(phone, fullMessage);
-
-      // Delay humanizado entre mensagens (3-8 segundos)
-      await randomDelay(3_000, 8_000);
 
       // Envia screenshot como imagem
       const imageCaption = pageUrl

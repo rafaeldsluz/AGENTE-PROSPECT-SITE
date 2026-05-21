@@ -13,15 +13,6 @@ export function createDispatchWorker(): Worker {
     async (job: Job<DispatchJobData>) => {
       const { leadId, whatsapp, companyName, screenshotPath, message, pageUrl } = job.data;
 
-      // Verifica janela de horário (08:00–18:00 BRT) a menos que override manual esteja ativo
-      if (!isWithinDispatchWindow() && !isManualOverrideActive()) {
-        const delayMs = msUntilWindowOpens();
-        const hoursUntil = Math.round(delayMs / 3_600_000 * 10) / 10;
-        log.info({ company: companyName, hoursUntil }, "Fora da janela de disparo — reagendando para 08:00");
-        await dispatchQueue.add(`dispatch-${leadId}-${Date.now()}`, job.data, { delay: delayMs });
-        return { status: "deferred", hoursUntil };
-      }
-
       log.info({ company: companyName, phone: whatsapp }, "Dispatch job iniciado");
 
       const success = await whatsappDispatcher.dispatch({
@@ -42,11 +33,7 @@ export function createDispatchWorker(): Worker {
     },
     {
       connection: redisConnection,
-      concurrency: 1, // Apenas 1 disparo por vez para segurança
-      limiter: {
-        max: 1,
-        duration: 120_000, // 1 por 2 minutos no máximo
-      },
+      concurrency: 5,
     }
   );
 

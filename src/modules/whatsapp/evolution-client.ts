@@ -24,8 +24,10 @@ interface SendMediaPayload {
 }
 
 interface ConnectionState {
-  state: "open" | "close" | "connecting";
-  statusReason?: number;
+  instance: {
+    instanceName: string;
+    state: "open" | "close" | "connecting";
+  };
 }
 
 export class EvolutionApiClient {
@@ -49,8 +51,8 @@ export class EvolutionApiClient {
       const response = await this.http.get<ConnectionState>(
         `/instance/connectionState/${config.evolution.instance}`
       );
-      const isOpen = response.data.state === "open";
-      log.info({ state: response.data.state }, "Status da conexão WhatsApp");
+      const isOpen = response.data.instance.state === "open";
+      log.info({ state: response.data.instance.state }, "Status da conexão WhatsApp");
       return isOpen;
     } catch (err) {
       log.error({ error: String(err) }, "Erro ao verificar conexão Evolution API");
@@ -59,7 +61,8 @@ export class EvolutionApiClient {
   }
 
   async sendText(phone: string, message: string): Promise<string> {
-    const number = normalizePhone(phone);
+    const raw = normalizePhone(phone);
+    const number = raw.startsWith("55") ? raw : `55${raw}`;
 
     return withRetry(
       async () => {
@@ -83,7 +86,8 @@ export class EvolutionApiClient {
   }
 
   async sendImage(phone: string, imagePath: string, caption?: string): Promise<string> {
-    const number = normalizePhone(phone);
+    const raw = normalizePhone(phone);
+    const number = raw.startsWith("55") ? raw : `55${raw}`;
 
     // Converte imagem para base64
     const imageBuffer = await fs.readFile(imagePath);

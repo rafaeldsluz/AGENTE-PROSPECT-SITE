@@ -7,11 +7,10 @@ import { nicheClassifier } from "../../ai/niche-classifier.js";
 import { scoringEngine } from "../../lead-scoring/scoring-engine.js";
 import { contentPersonalizer } from "../../ai/content-personalizer.js";
 import { messageGenerator } from "../../ai/message-generator.js";
-import { renderScopePage } from "../../renderer/scope-renderer.js";
+import { templateEngine } from "../../renderer/template-engine.js";
 import { screenshotGenerator } from "../../screenshot/screenshot-generator.js";
 import { uploadPageToR2 } from "../../storage/r2-uploader.js";
 import { config } from "../../../config/index.js";
-import { isWithinDispatchWindow } from "../../dispatch-schedule.js";
 import type { PipelineJobData, DispatchJobData } from "../../../types/queue.types.js";
 import type { BusinessRaw, BusinessValidated, BusinessEnriched } from "../../../types/business.types.js";
 import type { Lead } from "../../../database/schema.js";
@@ -86,12 +85,12 @@ async function stageRenderAndCapture(
   enriched: BusinessEnriched
 ): Promise<{ screenshotPath: string; pageUrl: string | null }> {
   const templateData = await contentPersonalizer.personalize(enriched);
-  const scopeFilePath = await renderScopePage(templateData);
-  await leadRepository.updatePagePath(leadId, scopeFilePath);
+  const page = await templateEngine.render(templateData);
+  await leadRepository.updatePagePath(leadId, page.filePath);
 
   const [screenshot, pageUrl] = await Promise.all([
-    screenshotGenerator.capture(scopeFilePath, enriched.name),
-    uploadPageToR2(scopeFilePath, enriched.name, leadId),
+    screenshotGenerator.capture(page.filePath, enriched.name),
+    uploadPageToR2(page.filePath, enriched.name, leadId),
   ]);
 
   await leadRepository.updateScreenshotPath(leadId, screenshot.filePath);
@@ -159,12 +158,7 @@ export function createPipelineWorker(): Worker {
         ...(pageUrl ? { pageUrl } : {}),
       };
 
-      // Durante horário comercial: delay curto (30–90s) para parecer humano.
-      // Fora do horário: delay longo — o dispatch.worker vai reagendar para 08:00 de qualquer forma.
-      const dispatchDelay = isWithinDispatchWindow()
-        ? Math.floor(Math.random() * 60_000) + 30_000   // 30s–90s
-        : Math.floor(Math.random() * 300_000) + 60_000; // 1–6 min
-      await dispatchQueue.add(`dispatch-${leadId}`, dispatchJob, { delay: dispatchDelay });
+      await dispatchQueue.add(`dispatch-${leadId}`, dispatchJob);
 
       await job.updateProgress(100);
       log.info({ name: lead.name, niche: enriched.niche, score: enriched.score }, "Pipeline concluído");

@@ -5,6 +5,7 @@ import {
   isUrlAccessible,
   isParkedPage,
   generateDomainCandidates,
+  resolveGoogleRedirect,
 } from "./domain-checker.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import { randomDelay } from "../../utils/delay.js";
@@ -27,15 +28,17 @@ export class WebsiteValidator {
 
     // ── Check 1: Website declarado no Google Maps ──────────────────────────
     if (business.website) {
-      const domain = extractDomain(business.website);
+      // Resolve redirecionamento Google (/url?q=https://empresa.com.br/...) antes de validar
+      const resolvedWebsite = resolveGoogleRedirect(business.website);
+      const domain = extractDomain(resolvedWebsite);
       const isSocial = isSocialOrDirectoryDomain(domain);
 
       if (!isSocial) {
-        const active = await isUrlAccessible(business.website);
+        const active = await isUrlAccessible(resolvedWebsite);
         checks.push({
           source: "google_maps_website",
           result: active,
-          detail: `Website declarado: ${business.website} (ativo: ${active})`,
+          detail: `Website declarado: ${resolvedWebsite} (ativo: ${active})`,
           weight: 0.95,
         });
       } else {
@@ -48,8 +51,8 @@ export class WebsiteValidator {
     // .com genéricos que pertencem a empresas diferentes em outros países
     if (!checks.some((c) => c.result)) {
       const candidates = generateDomainCandidates(business.name)
-        .filter((c) => c.endsWith(".com.br") && !isSocialOrDirectoryDomain(c));
-      for (const candidate of candidates.slice(0, 2)) {
+        .filter((c) => !isSocialOrDirectoryDomain(c));
+      for (const candidate of candidates.slice(0, 4)) {
         await randomDelay(300, 800);
         const active = await isDomainActive(candidate);
         if (active) {

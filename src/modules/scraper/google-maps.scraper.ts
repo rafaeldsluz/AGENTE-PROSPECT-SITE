@@ -36,13 +36,6 @@ const NICHE_QUERIES: Record<string, string[]> = {
     "corretor de imóveis",
     "consultoria imobiliária",
   ],
-  // Serviços: ninguém tem o contato salvo — procura no Google na hora da necessidade
-  servicos: [
-    "dedetizadora",
-    "empresa de limpeza",
-    "marmoraria",
-    "chaveiro",
-  ],
   // Advogados: credibilidade exige site, busca ativa por especialidade
   advogado: [
     "escritório de advocacia",

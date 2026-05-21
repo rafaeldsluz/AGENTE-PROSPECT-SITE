@@ -30,12 +30,23 @@ const DIRECTORY_DOMAINS = new Set([
   "negocios.com.br", "negocios.com",
 ]);
 
+// Decodifica URLs de redirecionamento do Google (/url?q=https://...) para obter o destino real
+export function resolveGoogleRedirect(url: string): string {
+  if (!url) return url;
+  const qMatch = url.match(/[?&]q=(https?%3A[^&]+|https?:\/\/[^&]+)/);
+  if (qMatch?.[1]) {
+    try { return decodeURIComponent(qMatch[1]); } catch { /* fallthrough */ }
+  }
+  return url;
+}
+
 export function extractDomain(url: string): string {
+  const resolved = resolveGoogleRedirect(url);
   try {
-    const parsed = new URL(url.startsWith("http") ? url : `https://${url}`);
+    const parsed = new URL(resolved.startsWith("http") ? resolved : `https://${resolved}`);
     return parsed.hostname.replace(/^www\./, "").toLowerCase();
   } catch {
-    return url.toLowerCase().replace(/^www\./, "");
+    return resolved.toLowerCase().replace(/^www\./, "");
   }
 }
 
@@ -61,7 +72,8 @@ export async function isDomainActive(domain: string): Promise<boolean> {
 
 export async function isUrlAccessible(url: string): Promise<boolean> {
   try {
-    const fullUrl = url.startsWith("http") ? url : `https://${url}`;
+    const resolved = resolveGoogleRedirect(url);
+    const fullUrl = resolved.startsWith("http") ? resolved : `https://${resolved}`;
     const response = await withRetry(
       () => axios.head(fullUrl, {
         timeout: 8_000,
@@ -75,7 +87,8 @@ export async function isUrlAccessible(url: string): Promise<boolean> {
   } catch {
     // Tenta HTTP como fallback
     try {
-      const httpUrl = url.startsWith("http") ? url.replace("https://", "http://") : `http://${url}`;
+      const resolved = resolveGoogleRedirect(url);
+      const httpUrl = resolved.startsWith("http") ? resolved.replace("https://", "http://") : `http://${resolved}`;
       const response = await axios.head(httpUrl, {
         timeout: 8_000,
         maxRedirects: 5,
