@@ -3,27 +3,9 @@ import path from "path";
 import { config } from "../../config/index.js";
 import { createModuleLogger } from "../../utils/logger.js";
 import type { TemplateData, RenderedPage } from "../../types/template.types.js";
-import type { Niche } from "../../types/business.types.js";
-import { renderClinicaTemplate } from "./templates/clinica.template.js";
-import { renderImoveisTemplate } from "./templates/imoveis.template.js";
-import { renderAdvogadoTemplate } from "./templates/advogado.template.js";
-import { renderOficinaTemplate } from "./templates/oficina.template.js";
-import { renderComercioTemplate } from "./templates/comercio.template.js";
-import { renderAutomoveisTemplate } from "./templates/automoveis.template.js";
+import { renderDemoTemplate } from "./demo-template-engine.js";
 
 const log = createModuleLogger("renderer");
-
-type TemplateRenderer = (data: TemplateData) => string;
-
-const TEMPLATE_MAP: Record<Niche, TemplateRenderer> = {
-  clinica: renderClinicaTemplate,
-  imoveis: renderImoveisTemplate,
-  advogado: renderAdvogadoTemplate,
-  servicos: renderOficinaTemplate,
-  comercio: renderComercioTemplate,
-  automoveis: renderAutomoveisTemplate,
-  outros: renderClinicaTemplate,
-};
 
 function sanitizeFilename(name: string): string {
   return name
@@ -37,8 +19,7 @@ function sanitizeFilename(name: string): string {
 
 export class TemplateEngine {
   async render(data: TemplateData): Promise<RenderedPage> {
-    const renderer = TEMPLATE_MAP[data.niche];
-    const html = renderer(data);
+    const html = renderDemoTemplate(data);
 
     await fs.mkdir(config.paths.pages, { recursive: true });
 

@@ -55,8 +55,8 @@ async function stageValidate(lead: Lead): Promise<
   return { ok: true, business: { ...businessRaw, validation } };
 }
 
-/** Nichos que não têm template nem potencial comercial no pipeline atual */
-const DISQUALIFIED_NICHES = new Set(["servicos", "outros"]);
+/** Nichos fora do escopo comercial do pipeline atual */
+const DISQUALIFIED_NICHES = new Set(["servicos", "outros", "comercio"]);
 
 async function stageEnrich(
   leadId: string,

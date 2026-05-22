@@ -1,6 +1,4 @@
-import { config } from "../../config/index.js";
 import { createModuleLogger } from "../../utils/logger.js";
-import { randomDelay } from "../../utils/delay.js";
 import { evolutionClient } from "./evolution-client.js";
 import { dispatchRepository } from "../../database/repositories/dispatch.repository.js";
 import { leadRepository } from "../../database/repositories/lead.repository.js";

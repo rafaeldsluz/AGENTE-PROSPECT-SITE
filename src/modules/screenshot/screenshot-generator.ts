@@ -72,20 +72,21 @@ export class ScreenshotGenerator {
       const filename = `${sanitized}-${Date.now()}.jpg`;
       const outputPath = path.join(config.paths.screenshots, filename);
 
-      // Screenshot do viewport — JPEG 88% reduz tamanho em ~7x vs PNG sem impacto visual
+      // Full-page JPEG — captura a landing page completa para prospecção
       await page.screenshot({
         path: outputPath,
-        clip: { x: 0, y: 0, width: 1440, height: 900 },
+        fullPage: true,
         type: "jpeg",
         quality: 88,
       });
 
+      const { width, height } = page.viewportSize() ?? { width: 1440, height: 0 };
       log.info({ company: companyName, file: filename }, "Screenshot capturada");
 
       return {
         filePath: path.resolve(outputPath),
-        width: 1440,
-        height: 900,
+        width,
+        height,
       };
     } finally {
       await page.close();

@@ -74,27 +74,29 @@ export async function isUrlAccessible(url: string): Promise<boolean> {
   try {
     const resolved = resolveGoogleRedirect(url);
     const fullUrl = resolved.startsWith("http") ? resolved : `https://${resolved}`;
-    const response = await withRetry(
+    // validateStatus: () => true — qualquer resposta HTTP (incluindo 403/401/405)
+    // significa que o servidor existe. Só erramos na ausência de conexão.
+    await withRetry(
       () => axios.head(fullUrl, {
         timeout: 8_000,
         maxRedirects: 5,
         headers: { "User-Agent": "Mozilla/5.0 (compatible; ProspectorBot/1.0)" },
-        validateStatus: (status) => status < 500,
+        validateStatus: () => true,
       }),
       { maxAttempts: 2, baseDelayMs: 2_000, maxDelayMs: 6_000 }
     );
-    return response.status < 400;
+    return true;
   } catch {
     // Tenta HTTP como fallback
     try {
       const resolved = resolveGoogleRedirect(url);
       const httpUrl = resolved.startsWith("http") ? resolved.replace("https://", "http://") : `http://${resolved}`;
-      const response = await axios.head(httpUrl, {
+      await axios.head(httpUrl, {
         timeout: 8_000,
         maxRedirects: 5,
-        validateStatus: (s) => s < 500,
+        validateStatus: () => true,
       });
-      return response.status < 400;
+      return true;
     } catch {
       return false;
     }

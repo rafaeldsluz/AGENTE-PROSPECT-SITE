@@ -243,6 +243,10 @@ export class WebsiteValidator {
       return { points: 0, reason: "Redes sociais inacessíveis (neutro)", immediateDisqualify: false, siteUrl: null };
     }
   }
+
+  async close(): Promise<void> {
+    await googleSearchValidator.close();
+  }
 }
 
 export const websiteValidator = new WebsiteValidator();

@@ -10,7 +10,7 @@
 import "dotenv/config";
 import { db } from "../database/client.js";
 import { leads } from "../database/schema.js";
-import { inArray, eq } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { pipelineQueue, dispatchQueue } from "../modules/queue/queue-manager.js";
 import { setManualOverride } from "../modules/dispatch-schedule.js";
 import { createModuleLogger } from "../utils/logger.js";
@@ -71,7 +71,7 @@ async function main() {
         leadId: lead.id,
         placeId: lead.placeId,
         // Passa nicho já classificado para pular re-classificação IA
-        sourceNiche: lead.niche ?? undefined,
+        ...(lead.niche ? { sourceNiche: lead.niche } : {}),
       },
       { priority: 10 } // prioridade alta para processar antes dos novos scrapes
     );

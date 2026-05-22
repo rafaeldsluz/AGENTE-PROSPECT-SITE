@@ -15,6 +15,7 @@ import { createPipelineWorker } from "./modules/queue/workers/pipeline.worker.js
 import { createDispatchWorker } from "./modules/queue/workers/dispatch.worker.js";
 import { getNicheQueries } from "./modules/scraper/google-maps.scraper.js";
 import { screenshotGenerator } from "./modules/screenshot/screenshot-generator.js";
+import { websiteValidator } from "./modules/validator/website-validator.js";
 import { initManualOverride } from "./modules/dispatch-schedule.js";
 import { cleanOldOutputFiles } from "./utils/output-cleaner.js";
 import type { Worker } from "bullmq";
@@ -111,7 +112,7 @@ export class Orchestrator {
     log.info("Encerrando sistema...");
 
     await Promise.all(this.workers.map((w) => w.close()));
-    await screenshotGenerator.close();
+    await Promise.all([screenshotGenerator.close(), websiteValidator.close()]);
     await closeQueues();
     await closeConnection();
     this.dashboardServer?.close();

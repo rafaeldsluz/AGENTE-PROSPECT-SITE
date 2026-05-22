@@ -5,16 +5,21 @@ import { createModuleLogger } from "../../utils/logger.js";
 
 const log = createModuleLogger("r2-uploader");
 
+let _client: S3Client | null = null;
+
 function getClient(): S3Client {
-  const { accountId, accessKeyId, secretAccessKey } = config.r2;
-  return new S3Client({
-    region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: accessKeyId!,
-      secretAccessKey: secretAccessKey!,
-    },
-  });
+  if (!_client) {
+    const { accountId, accessKeyId, secretAccessKey } = config.r2;
+    _client = new S3Client({
+      region: "auto",
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: accessKeyId!,
+        secretAccessKey: secretAccessKey!,
+      },
+    });
+  }
+  return _client;
 }
 
 function buildKey(companyName: string, leadId: string): string {

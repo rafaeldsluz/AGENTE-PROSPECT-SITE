@@ -27,7 +27,7 @@ async function main() {
   for (const lead of pending) {
     await pipelineQueue.add(
       `rerender-premium-${lead.id}`,
-      { leadId: lead.id, placeId: lead.placeId, sourceNiche: lead.niche ?? undefined },
+      { leadId: lead.id, placeId: lead.placeId, ...(lead.niche ? { sourceNiche: lead.niche } : {}) },
       { priority: 10 }
     );
   }

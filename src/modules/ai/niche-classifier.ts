@@ -13,9 +13,9 @@ interface ClassificationResult {
   reasoning: string;
 }
 
-/** Nichos ativos no pipeline. "servicos" e "outros" são disqualificados no pipeline.worker. */
+/** Os 4 nichos ativos no pipeline. Todos os outros são descartados. */
 const VALID_NICHES: Niche[] = [
-  "clinica", "imoveis", "servicos", "advogado", "comercio", "automoveis", "outros",
+  "clinica", "imoveis", "advogado", "automoveis",
 ];
 
 export class NicheClassifier {
@@ -59,17 +59,13 @@ export class NicheClassifier {
         keywords: [
           "concessionária", "concessionaria", "automóveis", "automoveis",
           "veículos", "veiculos", "multimarcas", "seminovos", "usados",
-          "carros", "motos", "caminhões", "caminhoes",
+          "revenda de carros", "revendedora", "revenda de veículos",
+          "carros novos", "carros usados", "veículos novos", "veículos usados",
           "fiat", "chevrolet", "volkswagen", "toyota", "honda", "ford",
           "hyundai", "renault", "nissan", "jeep", "dodge", "bmw",
           "mercedes", "audi", "volvo", "peugeot", "citroën", "mitsubishi",
           "kia", "ram", "chery",
-          "oficina mecânica", "oficina", "mecânica automotiva", "mecânica",
-          "funilaria", "funileiro", "pintura automotiva",
-          "auto center", "autocenter", "autopeças", "auto peças",
-          "borracharia", "alinhamento", "balanceamento",
-          "estética automotiva", "higienização veicular", "lavagem automotiva",
-          "test drive", "financiamento de veículos", "revisão de veículos",
+          "test drive", "financiamento de veículos",
         ],
         confidence: 0.93,
       },
@@ -93,26 +89,6 @@ export class NicheClassifier {
         ],
         confidence: 0.92,
       },
-      {
-        niche: "comercio",
-        keywords: [
-          "ótica", "assistência técnica", "gráfica", "uniforme", "pet shop",
-          "lavanderia", "material de construção", "ferragem", "vidraçaria",
-          "papelaria", "floricultura", "brindes", "presentes",
-          "academia", "personal trainer", "pilates", "crossfit",
-          "restaurante", "lanchonete", "padaria", "pizzaria",
-        ],
-        confidence: 0.86,
-      },
-      {
-        niche: "servicos",
-        keywords: [
-          "dedetizadora", "chaveiro", "marmoraria", "desentupidora",
-          "limpeza", "higienização", "manutenção", "instalação",
-          "contabilidade", "contador", "contábil",
-        ],
-        confidence: 0.85,
-      },
     ];
 
     for (const p of patterns) {
@@ -121,7 +97,7 @@ export class NicheClassifier {
       }
     }
 
-    return { niche: "outros", confidence: 0.5, reasoning: "Nenhuma keyword específica encontrada" };
+    return { niche: "outros", confidence: 0.5, reasoning: "Nenhuma keyword específica encontrada — descartado" };
   }
 
   private async classifyWithAI(companyName: string, category: string): Promise<ClassificationResult> {
@@ -132,13 +108,11 @@ export class NicheClassifier {
       system: `Você é um classificador de nichos de negócios locais brasileiros.
 Classifique o negócio em exatamente um dos seguintes nichos:
 - advogado: escritórios de advocacia, jurídico, OAB
-- automoveis: concessionárias, multimarcas, oficinas, mecânicas, funilarias, auto center, estética automotiva, autopeças, borracharia
+- automoveis: concessionárias, multimarcas, revendas de carros/veículos, lojas de seminovos (APENAS venda de veículos — NÃO incluir oficinas, mecânicas, funilarias, auto centers, borracharias)
 - imoveis: imobiliárias, corretores, construtoras, loteamentos
-- clinica: clínicas médicas, dentistas, psicólogos, fisioterapeutas, veterinários, estética, spa, depilação
-- comercio: comércios locais, lojas, academias, restaurantes, padarias, pet shops
-- servicos: serviços técnicos, dedetizadoras, chaveiros, limpeza, contabilidade
-- outros: não se enquadra nos nichos acima
+- clinica: clínicas médicas, dentistas, psicólogos, fisioterapeutas, veterinários, estética corporal/facial, spa, depilação
 
+Se o negócio não se encaixar claramente em um dos 4 nichos acima, responda com niche "outros".
 Responda APENAS em JSON com o formato: {"niche": "...", "confidence": 0.0-1.0, "reasoning": "..."}`,
       messages: [
         {
