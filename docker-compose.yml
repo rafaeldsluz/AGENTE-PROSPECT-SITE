@@ -23,7 +23,7 @@ services:
     image: redis:7-alpine
     container_name: prospector_redis
     restart: unless-stopped
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 256mb --maxmemory-policy noeviction --appendonly yes
     ports:
       - "6381:6379"
     volumes:

@@ -9,6 +9,7 @@ interface RetryOptions {
   maxDelayMs: number;
   factor?: number;
   onRetry?: (attempt: number, error: Error) => void;
+  shouldRetry?: (err: Error) => boolean;
 }
 
 export async function withRetry<T>(
@@ -25,6 +26,7 @@ export async function withRetry<T>(
       lastError = err instanceof Error ? err : new Error(String(err));
 
       if (attempt === maxAttempts) break;
+      if (options.shouldRetry && !options.shouldRetry(lastError)) break;
 
       const delay = Math.min(baseDelayMs * Math.pow(factor, attempt - 1), maxDelayMs);
       const jitter = Math.random() * 0.3 * delay;

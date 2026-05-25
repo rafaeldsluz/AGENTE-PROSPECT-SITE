@@ -81,7 +81,11 @@ export class EvolutionApiClient {
         log.info({ number, messageId }, "Texto enviado com sucesso");
         return messageId;
       },
-      { maxAttempts: 3, baseDelayMs: 5_000, maxDelayMs: 30_000 }
+      {
+        maxAttempts: 3, baseDelayMs: 5_000, maxDelayMs: 30_000,
+        // 400 = número sem WhatsApp — erro permanente, retry não resolve
+        shouldRetry: (err) => (err as any)?.response?.status !== 400,
+      }
     );
   }
 
@@ -112,7 +116,10 @@ export class EvolutionApiClient {
         log.info({ number, messageId }, "Imagem enviada com sucesso");
         return messageId;
       },
-      { maxAttempts: 3, baseDelayMs: 5_000, maxDelayMs: 30_000 }
+      {
+        maxAttempts: 3, baseDelayMs: 5_000, maxDelayMs: 30_000,
+        shouldRetry: (err) => (err as any)?.response?.status !== 400,
+      }
     );
   }
 
@@ -121,12 +128,12 @@ export class EvolutionApiClient {
       const number = normalizePhone(phone);
       const jid = toWhatsAppJid(number);
 
-      const response = await this.http.post<{ numberExists: boolean }>(
+      const response = await this.http.post<Array<{ exists: boolean; jid: string; number: string }>>(
         `/chat/whatsappNumbers/${config.evolution.instance}`,
         { numbers: [jid] }
       );
 
-      return response.data?.numberExists ?? false;
+      return response.data?.[0]?.exists ?? false;
     } catch {
       // Se não conseguir verificar, assume que existe para não bloquear o fluxo
       return true;
